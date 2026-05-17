@@ -1,0 +1,9 @@
+{
+  "cif": "examples/ice_test.cif",
+  "supercell": [1, 1, 1],
+  "mol_type": "h2o",
+  "R_cut": 6.0,
+  "T_K": 300,
+  "eps_match": 0.10,
+  "bank_file": "examples/ice_test_bank.json"
+}

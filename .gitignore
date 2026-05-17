@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+py39_venv/
+
+# テスト・キャッシュ
+.pytest_cache/
+.coverage
+htmlcov/
+
+# MotifBank 生成ファイル (コミット不要)
+*_bank.json
+motifbank_api.json
+api_keys.json
+api_access.log
+backups/
+
+# エディタ
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ログ・一時
+*.log
+*.pid
+*.tmp
+/tmp/
+
+# 無関係ファイル
+.bash_history
+.bash_logout
+.bashrc
+.profile
+.ssh/
+.local/
+.config/
+.cache/
+.vscode-server/
+.dotnet/
+fk*.md
+*.png
+*.mp4
+*.eam.alloy
+lammps_runs/
+texlive/
+study/
+project/
+residual-observatory/
+PES_py/
+fxpy/
+yoi-c/
+installSwapfile/
+motifbank/
+motif_bank_pc.json
+bench_ice.json
