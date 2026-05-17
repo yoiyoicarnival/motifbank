@@ -661,6 +661,31 @@ def from_cif(cif_path, supercell=(1, 1, 1), mol_type="auto",
             atypes.append(["Si"] + ["O"] * len(o_picked))
         return mols, atypes, label
 
+    elif mol_type == "si_oh4":
+        # H-capped Si(OH)4: Si + 4O + 4H (中性, charge=0)
+        # H を O-Si 方向の延長上 0.96Å に配置 → dangling bond をキャップ
+        Si_idx = [i for i, s in enumerate(symbols) if s == 'Si']
+        O_idx  = [i for i, s in enumerate(symbols) if s == 'O']
+        OH_BOND = 0.96   # Å
+        mols, atypes = [], []
+        for si in Si_idx:
+            sp = positions[si]
+            o_dists = sorted(
+                [(np.linalg.norm(sp - positions[oi]), oi)
+                 for oi in O_idx]
+            )[:4]
+            o_coords = [positions[d[1]] for d in o_dists]
+            h_coords = []
+            for oc in o_coords:
+                # Si→O 方向の延長上に H を配置 (もう一方の Si の代わり)
+                v = oc - sp
+                v_unit = v / np.linalg.norm(v)
+                h_coords.append(oc + v_unit * OH_BOND)
+            coords = np.array([sp] + o_coords + h_coords)
+            mols.append(coords)
+            atypes.append(["Si"] + ["O"] * 4 + ["H"] * 4)
+        return mols, atypes, label
+
     # -- 汎用: 1原子 = 1分子 --
     else:  # "atoms"
         mols   = [positions[i:i+1].copy() for i in range(len(positions))]
