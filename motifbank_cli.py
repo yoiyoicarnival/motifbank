@@ -667,45 +667,52 @@ def from_cif(cif_path, supercell=(1, 1, 1), mol_type="auto",
         return mols, atypes, label
 
     # -- SiO4: Si + 最近傍 4O --
-    elif mol_type == "sio4":
+    elif mol_type in ("sio4", "si_oh4"):
+        # MIC (minimum image convention) 付きで O を取得
+        # 周期境界をまたぐ Si-O 結合も正しく処理する
         Si_idx = [i for i, s in enumerate(symbols) if s == 'Si']
         O_idx  = [i for i, s in enumerate(symbols) if s == 'O']
-        mols, atypes = [], []
-        for si in Si_idx:
-            sp = positions[si]
-            o_dists = sorted(
-                [(np.linalg.norm(sp - positions[oi]), oi)
-                 for oi in O_idx]
-            )[:4]
-            o_picked = [d[1] for d in o_dists]
-            coords = np.array([positions[si]] + [positions[oi] for oi in o_picked])
-            mols.append(coords)
-            atypes.append(["Si"] + ["O"] * len(o_picked))
-        return mols, atypes, label
+        cell   = atoms.get_cell()
+        pbc    = atoms.get_pbc()
 
-    elif mol_type == "si_oh4":
-        # H-capped Si(OH)4: Si + 4O + 4H (中性, charge=0)
-        # H を O-Si 方向の延長上 0.96Å に配置 → dangling bond をキャップ
-        Si_idx = [i for i, s in enumerate(symbols) if s == 'Si']
-        O_idx  = [i for i, s in enumerate(symbols) if s == 'O']
-        OH_BOND = 0.96   # Å
+        def mic_dist_and_vec(si_pos, o_pos):
+            """Si→O の MIC 最短ベクトルと距離を返す"""
+            diff = o_pos - si_pos
+            # セル行列の逆変換で fractional coords に変換
+            if np.any(pbc):
+                frac = np.linalg.solve(cell.T, diff)
+                frac -= np.round(frac)
+                diff = cell.T @ frac
+            return np.linalg.norm(diff), diff
+
         mols, atypes = [], []
+        OH_BOND = 0.96  # Å
+
         for si in Si_idx:
             sp = positions[si]
-            o_dists = sorted(
-                [(np.linalg.norm(sp - positions[oi]), oi)
-                 for oi in O_idx]
-            )[:4]
-            o_coords = [positions[d[1]] for d in o_dists]
-            h_coords = []
-            for oc in o_coords:
-                # Si→O 方向の延長上に H を配置 (もう一方の Si の代わり)
-                v = oc - sp
-                v_unit = v / np.linalg.norm(v)
-                h_coords.append(oc + v_unit * OH_BOND)
-            coords = np.array([sp] + o_coords + h_coords)
-            mols.append(coords)
-            atypes.append(["Si"] + ["O"] * 4 + ["H"] * 4)
+            o_dists = []
+            for oi in O_idx:
+                d, vec = mic_dist_and_vec(sp, positions[oi])
+                o_dists.append((d, oi, vec))
+            o_dists.sort()
+            top4 = o_dists[:4]
+
+            # O の実座標 (MIC ベクトルで補正)
+            o_coords = [sp + v for (_, _, v) in top4]
+
+            if mol_type == "sio4":
+                coords = np.array([sp] + o_coords)
+                mols.append(coords)
+                atypes.append(["Si"] + ["O"] * 4)
+            else:  # si_oh4
+                h_coords = []
+                for oc, (_, _, v) in zip(o_coords, top4):
+                    v_unit = v / np.linalg.norm(v)
+                    h_coords.append(oc + v_unit * OH_BOND)
+                coords = np.array([sp] + o_coords + h_coords)
+                mols.append(coords)
+                atypes.append(["Si"] + ["O"] * 4 + ["H"] * 4)
+
         return mols, atypes, label
 
     # -- 汎用: 1原子 = 1分子 --

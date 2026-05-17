@@ -17,10 +17,10 @@ import numpy as np
 
 DATA = [
     # (label,          N_bank_sat, measured, phase, note)
-    ("ice Ih\n(ordered)",       16,    True,  0, "H2O, 3x3 CIF, sat at 8x"),
-    ("LTA\nzeolite",            66,    True,  0, "si_oh4, sat at 4x (N=96)"),
-    ("α-cristobalite\n(SiO2)",  400,   False, 0, "推定 ~400, γ=0.22 at N=128"),
-    ("MFI\nsilicalite-1",       644,   True,  0, "sio4, R_cut=5.5Å, sat at 2x2x2"),
+    ("ice Ih\n(ordered)",        16,   True,  0, "H2O, 3x3 CIF, um=1, sat at 8x"),
+    ("α-cristobalite\n(SiO2)",   18,   True,  0, "si_oh4, um=1, sat at 4x (N=16)"),
+    ("LTA\nzeolite",             66,   True,  0, "si_oh4, um=1, sat at 4x (N=96)"),
+    ("MFI\nsilicalite-1",       282,   True,  0, "si_oh4, um=1, sat at 1x1x1 (N=96)"),
     ("defect MFI\n(M=12 types)",1800,  False, 1, "sparse 5% defect, γ=0.18"),
     ("amorphous\nSi(OH)4",      None,  False, 3, "N→∞, γ=1.56"),
 ]

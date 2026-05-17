@@ -56,7 +56,7 @@ def main():
     print("\n── P1: 単一 Si(OH)4 PBE/def2-SVP 収束テスト ──")
     mols, atypes, _ = from_cif(CIF, supercell=(1,1,1),
                                 mol_type="si_oh4", verbose=False)
-    N_SAMPLE = 3   # 異なる geom_key を持つ断片を最大 3 つ測定
+    N_SAMPLE = 1   # 異なる geom_key を持つ断片を最大 1 つ測定 (速度確認用)
 
     # N_SAMPLE 個のユニーク断片を選ぶ
     seen_keys = set()
@@ -103,18 +103,18 @@ def main():
     # ── P2: wall-clock speedup 外挿 ──────────────────────────────────
     print("\n── P2: wall-clock speedup 外挿 (MFI silicalite-1) ──")
     print()
-    # 実測スケーリング表 (motifbank_mfi_result.md より)
+    # 実測スケーリング表 (MIC 修正後, N_bank=282 で飽和)
     table = [
-        ("1x1x1",   96,    1450,  526),
-        ("2x2x1",  384,    6682,  572),
-        ("2x2x2",  768,   14690,  644),
-        ("4x2x2", 1536,   29690,  644),
+        ("1x1x1",   96,    1450,  282),
+        ("2x2x1",  384,    6682,  282),
+        ("2x2x2",  768,   14690,  282),
+        ("4x2x2", 1536,   29690,  282),
     ]
-    # 外挿 (N_bank = 644 固定)
+    # 外挿 (N_bank = 282 固定)
     extra = [
-        (3072,  65000, 644),
-        (6144, 140000, 644),
-       (10000, 240000, 644),
+        (3072,  65000, 282),
+        (6144, 140000, 282),
+       (10000, 240000, 282),
     ]
 
     print(f"  {'supercell':8s}  {'N':>6}  {'T_naive':>10}  {'T_bank':>9}  {'speedup':>8}")
@@ -133,9 +133,9 @@ def main():
         print(f"  {'(外挿)':8s}  {N:>6}  {t_n:>8.1f}h  {t_b:>7.1f}h  {spd:>7.0f}x")
 
     print(f"\n  T_QC (PBE/def2-SVP) = {T_avg:.1f}s/call を仮定")
-    # 最大 speedup (N=768 実測)
+    # 最大 speedup (N=768 実測, MIC 修正後 N_bank=282)
     qc_naive_768 = 14690
-    qc_bank_768  = 644
+    qc_bank_768  = 282
     t_n_768 = qc_naive_768 * T_avg / 3600
     t_b_768 = qc_bank_768  * T_avg / 3600
     print(f"  N=768: naive {t_n_768:.1f}h → bank {t_b_768:.1f}h  ({qc_naive_768/qc_bank_768:.0f}× speedup)")
@@ -148,9 +148,22 @@ def main():
     if not args.n5:
         print(f"  {SKIP}  P3  --n5 フラグで実行 (~5 min)")
     else:
-        # N=5 の小系を手動構築 (MFI の最初の5断片)
-        mols5   = mols[:5]
-        atypes5 = atypes[:5]
+        # N=5 の小系: PySCF で収束する断片のみを選択
+        # (一部断片は SCF が難しいため除外)
+        good_idx = []
+        for ci in range(len(mols)):
+            if len(good_idx) >= 5:
+                break
+            try:
+                e_test = qc_compute_pyscf([mols[ci]], [atypes[ci]],
+                                          basis=BASIS, method=METHOD,
+                                          charge=0, spin=0)
+                good_idx.append(ci)
+            except RuntimeError:
+                pass
+        mols5   = [mols[i] for i in good_idx]
+        atypes5 = [atypes[i] for i in good_idx]
+        print(f"  使用断片 idx={good_idx}")
 
         from functools import partial
         qc_pbe = partial(qc_compute_pyscf,
@@ -161,10 +174,11 @@ def main():
 
         print("  naive MBE 実行中...")
         t0 = time.perf_counter()
-        E_naive = run_mbe(mols5, bank_naive, r_cut=R_CUT,
-                          qc_func=qc_pbe, atom_types_list=atypes5,
-                          charge_per_mol=0, verbose=False)
+        res_naive = run_mbe(mols5, bank_naive, r_cut=R_CUT,
+                            qc_func=qc_pbe, atom_types_list=atypes5,
+                            charge_per_mol=0, verbose=False)
         t_naive = time.perf_counter() - t0
+        E_naive = res_naive["E_total_Ha"]
 
         print("  bank MBE 実行中 (2回目=完全再利用)...")
         # 1回目: bank 構築
@@ -173,10 +187,11 @@ def main():
                 charge_per_mol=0, verbose=False)
         # 2回目: 完全再利用
         t0 = time.perf_counter()
-        E_bank = run_mbe(mols5, bank_banked, r_cut=R_CUT,
-                         qc_func=qc_pbe, atom_types_list=atypes5,
-                         charge_per_mol=0, verbose=False)
+        res_bank = run_mbe(mols5, bank_banked, r_cut=R_CUT,
+                           qc_func=qc_pbe, atom_types_list=atypes5,
+                           charge_per_mol=0, verbose=False)
         t_bank = time.perf_counter() - t0
+        E_bank = res_bank["E_total_Ha"]
 
         dE = abs(E_naive - E_bank)
         ok = dE < 1e-9
