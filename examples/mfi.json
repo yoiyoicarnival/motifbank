@@ -1,0 +1,13 @@
+{
+  "cif": "examples/MFI_iza.cif",
+  "supercell": [1, 1, 1],
+  "mol_type": "sio4",
+  "R_cut": 5.5,
+  "T_K": 300,
+  "eps_match": 0.10,
+  "qc_backend": "mock",
+  "qc_basis": "sto-3g",
+  "qc_method": "hf",
+  "bank_file": "examples/mfi_bank.json",
+  "_note": "MFI silicalite-1 (pure SiO2, IZA). SiO4四面体断片化。charge=-4が本来正しいが、mock QCでは無視。実PySCF使用時はcharge_per_mol=-4を指定。"
+}

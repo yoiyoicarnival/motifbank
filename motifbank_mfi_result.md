@@ -71,6 +71,27 @@
                        = N / 663    ← N に比例して成長
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+◆ 精度・正確性検証結果 (test_mfi_accuracy.py, 2026-05-17)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  検証結果: 7/7 PASS
+
+  A1. naive MBE == bank MBE       ΔE = 0.00e+00 Ha  (数値誤差ゼロ)
+  A2. memory_saving=True == False  ΔE = 0.00e+00 Ha  (大系最適化の正確性)
+  A3. geom_key 順序不変性          pair 10件すべて一致
+  A4. bank ROI (2回目)            100.0%  (完全再利用)
+  T1. 壁時間 speedup               1.8x  (5ms/call delay, 96 SiO4)
+      ※ 実 QC (数十秒/call) ならこの比は N に比例して成長
+  T2. QC call 削減比               346x  (naive=346, bank=0 on 2nd run)
+  N1. SiO4 charge=-4 PySCF        E = -578.485385 Ha (HF/STO-3G, 収束確認)
+
+  重要な注意点 (SiO4 の charge):
+    - SiO4 断片は形式的に [SiO4]^4- (電荷 -4)
+    - charge=0 では SCF 未収束 → 物理的に誤り
+    - 本番使用時は JSON に "charge_per_mol": -4 を追加すること
+    - より正確には H-capped 断片 Si(OH)4 (中性、推奨) を使うこと
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ◆ 現状の限界と次のステップ
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -78,12 +99,15 @@
     ✅ Phase 0 の確認 (MFI silicalite-1)
     ✅ QC コール数の実測削減比 (最大 45x, N=1536)
     ✅ bank 飽和の実証 (N_bank が N=768 以降で変化しない)
+    ✅ 精度検証 (コード正確性): naive == bank  ΔE = 0 exactly
+    ✅ memory_saving モード正確性: 同上
+    ✅ 壁時間 speedup: 5ms/call 模擬で 1.8x (実 QC では N 倍)
 
   まだやっていないこと:
-    ❌ 精度検証 — naive MBE vs MotifBank MBE のエネルギー差
-                  目標: < 1 kcal/mol / SiO4
+    ❌ 物理精度 — MBE 自体の打ち切り誤差 vs 周期 DFT 参照
+                  目標: < 1 kcal/mol / SiO4 (実験値または VASP/CP2K との比較)
     ❌ 実用理論 — HF/STO-3G ではなく PBE/def2-SVP または MP2/6-31G*
-    ❌ 壁時間  — QC コール数削減が実際の計算時間にどう対応するか
+                  (charge_per_mol=-4 を設定すれば PySCF で実行可能)
 
   次の1手:
     1536 SiO4 で naive MBE と MotifBank MBE を実際に走らせ、
