@@ -116,14 +116,19 @@
   材料による S_local 実測値:
     材料                     N_bank_sat   S_local      Phase
     ──────────────────────────────────────────────────────
-    ice Ih (3x3 CIF)              16      2.77 nats    0  (実測: 1x→8x で飽和)
-    alpha-cristobalite           ~400     ~6.0 nats    0  (収束中: γ=0.22)
-    MFI silicalite-1              644      6.47 nats   0  (実測: 2x2x2以降で飽和)
+    ice Ih (3x3 CIF)              16      2.77 nats    0  ✅ (1x→8x で飽和)
+    LTA zeolite (si_oh4)          66      4.19 nats    0  ✅ (4x=8x で飽和確認)
+    alpha-cristobalite           ~400     ~6.0 nats    0  ~ (収束中: γ=0.22 at N=128)
+    MFI silicalite-1              644      6.47 nats   0  ✅ (2x2x2以降で飽和)
+    defect MFI (M=12 vocab)      ~1800    ~7.5 nats    1  ~ (γ=0.18, sub-linear)
     アモルファス Si(OH)4          ∞        → ∞          3  (γ=1.56, linear)
 
   ※ ice Ih: N_bank=16 は 1x→8x でピッタリ飽和。S_local = log(16) = 2.77 nats
-  ※ cristobalite: 32x (N=128) でまだ成長中 (N_bank=355)。飽和値は ~400 と推定
-  ※ 材料の複雑度: ice < cristobalite ≈ MFI  (S_local で定量化)
+  ※ LTA: 1 T-site (cubic Pm-3m) → N_bank=66、MFI の 1/10 の複雑さ
+  ※ cristobalite: 1 T-site だが tetragonal → MFI に近い複雑さ (幾何多様性が大)
+  ※ MFI: 12 非等価 T-site → N_bank=644
+  ※ 材料の複雑度: ice < LTA < cristobalite ≈ MFI  (S_local で定量化)
+  ※ S_local の物理: T-site 数 × 局所対称性 が決定する (単純に T-site 数だけではない)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ◆ 精度・正確性検証結果 (test_mfi_accuracy.py, 2026-05-17)
