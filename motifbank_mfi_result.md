@@ -113,14 +113,17 @@
     - S_local が小さい材料 = MotifBank の効果が大きい (Phase 0 に近い)
     - S_local = ∞ (= log N) のとき Phase 3 (ランダム系)
 
-  材料による S_local の予測:
-    材料                  S_local 予測    Phase
-    ─────────────────────────────────────────
-    MFI silicalite-1      6.5 nats        0  (実測)
-    ice Ih                ~4 nats         0  (実測: N_bank=16)
-    cristobalite          ~5 nats         0  (実測: N_bank=32)
-    混合カチオンゼオライト ~8 nats         2  (LTA 実測)
-    アモルファス           → ∞             3
+  材料による S_local 実測値:
+    材料                     N_bank_sat   S_local      Phase
+    ──────────────────────────────────────────────────────
+    ice Ih (3x3 CIF)              16      2.77 nats    0  (実測: 1x→8x で飽和)
+    alpha-cristobalite           ~400     ~6.0 nats    0  (収束中: γ=0.22)
+    MFI silicalite-1              644      6.47 nats   0  (実測: 2x2x2以降で飽和)
+    アモルファス Si(OH)4          ∞        → ∞          3  (γ=1.56, linear)
+
+  ※ ice Ih: N_bank=16 は 1x→8x でピッタリ飽和。S_local = log(16) = 2.77 nats
+  ※ cristobalite: 32x (N=128) でまだ成長中 (N_bank=355)。飽和値は ~400 と推定
+  ※ 材料の複雑度: ice < cristobalite ≈ MFI  (S_local で定量化)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ◆ 精度・正確性検証結果 (test_mfi_accuracy.py, 2026-05-17)
@@ -153,18 +156,21 @@
     ✅ bank 飽和の実証 (N_bank が N=768 以降で変化しない)
     ✅ 精度検証 (コード正確性): naive == bank  ΔE = 0 exactly
     ✅ memory_saving モード正確性: 同上
-    ✅ 壁時間 speedup: 5ms/call 模擬で 1.8x (実 QC では N 倍)
+    ✅ N_bank(N) スケーリング図: crystal(γ=0.09) / defect(γ=0.18) / amorphous(γ=1.56)
+    ✅ S_local 実測: ice Ih = 2.77 nats (N_bank=16), MFI = 6.47 nats (N_bank=644)
+    ✅ PBE/def2-SVP 収束確認: E(Si(OH)4) = -592.129475 Ha, T_QC = 8.5s/call
+    ✅ wall-clock speedup 外挿: N=768 で 23x  (naive 34.8h → bank 1.5h at PBE level)
 
   まだやっていないこと:
-    ❌ 物理精度 — MBE 自体の打ち切り誤差 vs 周期 DFT 参照
-                  目標: < 1 kcal/mol / SiO4 (実験値または VASP/CP2K との比較)
-    ❌ 実用理論 — HF/STO-3G ではなく PBE/def2-SVP または MP2/6-31G*
-                  (charge_per_mol=-4 を設定すれば PySCF で実行可能)
+    ❌ PBE/def2-SVP での naive == bank 実証 (ΔE=0 は HF/STO-3G のみ)
+    ❌ 物理精度 — MBE 打ち切り誤差 vs 周期 DFT (VASP/CP2K との比較)
+                  目標: < 1 kcal/mol / SiO4
+    ❌ 第三者ベンチマーク (FMO 等との比較)
 
   次の1手:
-    1536 SiO4 で naive MBE と MotifBank MBE を実際に走らせ、
-    ΔE < 1 kcal/mol/SiO4 を確認する (PBE/def2-SVP 推奨)。
-    これが揃えば論文の core result になる。
+    PBE/def2-SVP で N=5 の小系に対して naive == bank を実証し、
+    ΔE=0 が実用 DFT レベルでも成立することを示す。
+    その後、第三者ベンチマーク (FMO 等) との比較で物理精度を確定する。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ◆ 再現コマンド
@@ -178,5 +184,14 @@
 
   # スケーリング解析 (このファイルの数字の再現)
   OMP_NUM_THREADS=1 python3 motifbank_mfi_scaling.py
+
+  # N_bank(N) スケーリング図 (crystal/defect/amorphous, 3フェーズ)
+  OMP_NUM_THREADS=1 python3 motifbank_scaling_figure.py --plot
+
+  # PBE/def2-SVP wall-clock ベンチマーク
+  OMP_NUM_THREADS=1 python3 test_pbe_wallclock.py
+
+  # FMO ベンチマークとの比較 (データ受領後)
+  OMP_NUM_THREADS=1 python3 compare_fmo_benchmark.py --ref ref.csv --system MFI
 
 ======================================================================

@@ -380,8 +380,30 @@ def qc_compute_pyscf(mol_list, atom_types_list=None,
         mycc = cc.CCSD(mf).run()
         return float(mycc.e_tot)
 
+    elif method_lower in ('pbe', 'b3lyp', 'lda', 'pbe0', 'bp86'):
+        from pyscf import dft, scf as _scf
+        mf = dft.RKS(mol_pyscf)
+        mf.xc = method_lower
+        mf.conv_tol = 1e-9
+        mf.max_cycle = 100
+        mf.grids.level = 4
+        mf.init_guess = 'minao'
+        mf.kernel()
+        if not mf.converged:
+            # Newton法 (2次収束) で再試行
+            mf2 = _scf.newton(dft.RKS(mol_pyscf))
+            mf2.xc = method_lower
+            mf2.conv_tol = 1e-9
+            mf2.max_cycle = 50
+            mf2.grids.level = 4
+            mf2.kernel(mf.mo_coeff, mf.mo_occ)
+            if not mf2.converged:
+                raise RuntimeError(f"DFT({method}) 未収束: {atom_str[:80]}...")
+            return float(mf2.e_tot)
+        return float(mf.e_tot)
+
     else:
-        raise ValueError(f"未対応メソッド: {method}  (hf / mp2 / ccsd)")
+        raise ValueError(f"未対応メソッド: {method}  (hf / mp2 / ccsd / pbe / b3lyp)")
 
 
 def make_qc_func(backend='mock', basis='sto-3g', method='hf',
