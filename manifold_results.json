@@ -1,0 +1,94 @@
+{
+  "exp1": {
+    "n_list": [
+      5,
+      10,
+      15,
+      20,
+      30,
+      40,
+      60,
+      80,
+      100,
+      120
+    ],
+    "mae_list": [
+      5.558250045188371,
+      4.624126882908166,
+      4.012667909389551,
+      3.7182607463506643,
+      3.5108807381084097,
+      3.287392996349465,
+      3.1446513818100033,
+      2.4672649581595936,
+      0.7278383720393717,
+      0.5418213154846072
+    ],
+    "alpha": 0.5851174113643396
+  },
+  "manifold": {
+    "dim_80pct": 10,
+    "dim_90pct": 14,
+    "dim_95pct": 17,
+    "dim_99pct": 20,
+    "total_dim": 72
+  },
+  "exp2": [
+    {
+      "threshold": 0.0005,
+      "gp_rate": 0.0,
+      "mae_kcal": NaN,
+      "T_total_s": 1615.0,
+      "speedup": 1.0,
+      "qc_reduction": 0.0
+    },
+    {
+      "threshold": 0.001,
+      "gp_rate": 0.0,
+      "mae_kcal": NaN,
+      "T_total_s": 1615.0,
+      "speedup": 1.0,
+      "qc_reduction": 0.0
+    },
+    {
+      "threshold": 0.002,
+      "gp_rate": 1.0,
+      "mae_kcal": 0.6460286417896017,
+      "T_total_s": 1140.05,
+      "speedup": 1.4166045348888208,
+      "qc_reduction": 0.2941176470588235
+    },
+    {
+      "threshold": 0.005,
+      "gp_rate": 1.0,
+      "mae_kcal": 0.6460286417896017,
+      "T_total_s": 1140.05,
+      "speedup": 1.4166045348888208,
+      "qc_reduction": 0.2941176470588235
+    }
+  ],
+  "exp3": {
+    "in_dist_sigma_median_mHa": 1.2816509513711716,
+    "in_dist_sigma_max_mHa": 1.7813666835854605,
+    "ood": {
+      "\u5927\u5909\u5f62 (\u03c3=0.10\u00c5)": {
+        "sigma_median_mHa": 15.126177293651912,
+        "sigma_max_mHa": 26.192390314326804,
+        "ratio_vs_in_dist": 11.802103589490729,
+        "detected": true
+      },
+      "Si-O \u5f15\u304d\u5ef6\u3070\u3057 (d>1.85\u00c5)": {
+        "sigma_median_mHa": 29.488758854790095,
+        "sigma_max_mHa": 29.578910696684083,
+        "ratio_vs_in_dist": 23.0084164672461,
+        "detected": true
+      },
+      "Si-O \u6975\u7aef\u5727\u7e2e (d<1.45\u00c5)": {
+        "sigma_median_mHa": 27.471174312746,
+        "sigma_max_mHa": 28.252607908794747,
+        "ratio_vs_in_dist": 21.43420896567511,
+        "detected": true
+      }
+    }
+  }
+}
