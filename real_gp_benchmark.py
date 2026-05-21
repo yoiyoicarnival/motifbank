@@ -43,7 +43,7 @@ KCAL = 627.5095   # Ha → kcal/mol
 MHA  = 1000.0     # Ha → mHa
 
 CACHE_FILE  = os.path.join(_SCRIPT_DIR, "real_gp_cache.json")
-RESULT_FILE = "/home/yoiyoi/real_gp_results.json"
+RESULT_FILE = os.path.join(_SCRIPT_DIR, "real_gp_results.json")
 
 # Si(OH)4 原子種 (9原子: Si O O O O H H H H)
 SIOH4_TYPES = ["Si", "O", "O", "O", "O", "H", "H", "H", "H"]

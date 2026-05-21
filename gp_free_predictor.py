@@ -195,18 +195,32 @@ class RoutingPredictor:
         self._mols_train = None
 
     def fit(self, encoder, scaler, mols_train, energies_train,
-            nw_tau=0.15, train_residual=True, n_atoms=9):
+            nw_tau=0.15, train_residual=True, n_atoms=9,
+            desc_scaler=None):
         self.encoder = encoder
         self.scaler  = scaler
         encoder.eval()
 
-        # 埋め込みを事前計算
+        # pairwise_desc (72-dim) — L2正規化してルーティング類似度に使用
+        X_raw = np.array([pairwise_desc(m) for m in mols_train], dtype=np.float64)
+        if desc_scaler is None:
+            from sklearn.preprocessing import StandardScaler as _SS
+            desc_scaler = _SS().fit(X_raw)
+        self._desc_scaler = desc_scaler
+        X_sc = desc_scaler.transform(X_raw).astype(np.float32)
+        # L2正規化 → cosine similarity でルーティング
+        norms = np.linalg.norm(X_sc, axis=1, keepdims=True)
+        norms[norms < 1e-10] = 1.0
+        X_norm = (X_sc / norms)
+        self._X_norm = X_norm   # (N, 72) L2-normalized pairwise_desc
+
+        # encoder embedding (NW予測に使用)
         Zs = []
         for mol in mols_train:
             x = scaler.transform(pairwise_desc(mol).reshape(1, -1))
             xt = torch.tensor(x, dtype=torch.float32)
             with torch.no_grad():
-                z = encoder(xt).numpy()[0]   # L2-normalized
+                z = encoder(xt).numpy()[0]
             Zs.append(z)
         Z  = np.array(Zs, dtype=np.float32)
         E  = np.array(energies_train, dtype=np.float64)
@@ -214,25 +228,30 @@ class RoutingPredictor:
         self._E_train     = E
         self._mols_train  = mols_train
 
-        # NW フィット
-        self.nw = NWRegressor(tau=nw_tau)
-        self.nw.fit(Z, E)
+        # NW: pairwise_desc ベース (より正確)
+        self._nw_desc = NWDescriptorRegressor(length_scale=nw_tau)
+        self._nw_desc.fit(X_sc, E)
 
-        # 残差補正NN (オプション)
+        # 残差補正NN
         if train_residual:
-            E_nw_tr = np.array([self.nw.predict(Z[i], k=min(50, len(E)-1))[0]
+            E_nw_tr = np.array([self._nw_desc.predict(X_sc[i], k=min(50, len(E)-1))[0]
                                  for i in range(len(E))])
             self.residual = ResidualCorrector()
             self.residual.fit(Z, E_nw_tr, E, n_epochs=500)
 
-        # FAISS index (L2-norm 済みベクトルで inner product = cosine)
+        # FAISS index for routing (pairwise_desc L2-norm)
         if FAISS_OK:
-            Z_idx = Z.copy()
-            faiss.normalize_L2(Z_idx)
-            self._faiss_index = faiss.IndexFlatIP(Z.shape[1])
-            self._faiss_index.add(Z_idx)
+            X_idx = X_norm.copy()
+            self._faiss_index = faiss.IndexFlatIP(X_norm.shape[1])
+            self._faiss_index.add(X_idx)
         else:
             self._faiss_index = None
+
+    def _desc_norm(self, mol):
+        """pairwise_desc → L2-normalized (72-dim) for routing"""
+        x = self._desc_scaler.transform(pairwise_desc(mol).reshape(1, -1))[0].astype(np.float32)
+        n = np.linalg.norm(x)
+        return x / n if n > 1e-10 else x
 
     def _embed(self, mol):
         x = self.scaler.transform(pairwise_desc(mol).reshape(1, -1))
@@ -240,7 +259,7 @@ class RoutingPredictor:
         with torch.no_grad():
             self.encoder.eval()
             z = self.encoder(xt).numpy()[0]
-        return z   # already L2-normalized by encoder
+        return z
 
     def predict(self, mol, n_atoms=9):
         """
@@ -248,16 +267,15 @@ class RoutingPredictor:
           (energy_Ha, uncertainty_Ha, level, sim_max)
           level: 0=exact, 1=nw, 1r=nw+residual, 2=dft_needed
         """
-        z = self._embed(mol)
-        z_idx = z.reshape(1, -1).astype(np.float32)
+        xn = self._desc_norm(mol)   # pairwise_desc で類似度判定
+        xn_idx = xn.reshape(1, -1).astype(np.float32)
 
-        # 最近傍の cosine similarity
         if self._faiss_index is not None:
-            sims, idxs = self._faiss_index.search(z_idx, 1)
+            sims, idxs = self._faiss_index.search(xn_idx, 1)
             max_sim = float(sims[0, 0])
             nn_idx  = int(idxs[0, 0])
         else:
-            sims = self._Z_train @ z
+            sims   = self._X_norm @ xn
             nn_idx  = int(np.argmax(sims))
             max_sim = float(sims[nn_idx])
 
@@ -269,9 +287,12 @@ class RoutingPredictor:
         if max_sim < self.sim_novel:
             return None, None, 2, max_sim
 
-        # ── Level 1: NW 補間 ──
-        mu, sigma = self.nw.predict(z, k=min(50, len(self._E_train)-1))
+        # ── Level 1: NW 補間 (pairwise_desc ベース) ──
+        x_sc = (self._desc_scaler.transform(pairwise_desc(mol).reshape(1,-1))[0]
+                .astype(np.float64))
+        mu, sigma = self._nw_desc.predict(x_sc, k=min(50, len(self._E_train)-1))
         if self.residual is not None:
+            z = self._embed(mol)
             delta = self.residual.correct(z)
             mu += delta
             return mu, sigma, "1r", max_sim
@@ -378,6 +399,34 @@ def exp_gp_free():
     desc_scaler = _SS().fit(X_pd[idx_tr])
     X_tr_sc = desc_scaler.transform(X_pd[idx_tr])
     X_te_sc = desc_scaler.transform(X_pd[idx_te])
+
+    # ── [B3] GP-calibrated NW (GPのARD length-scaleをNWに転用) ──
+    print("\n  [B3] GP-calibrated NW (GP pipeline: scaler→PCA→ARD NW)")
+    try:
+        # GP pipeline: gp.scaler_x → gp.pca → ARD Matérn
+        # 同じ変換を適用してからARD重みでスケーリング
+        X_tr_pca = gp.pca.transform(gp.scaler_x.transform(X_pd[idx_tr]))
+        X_te_pca = gp.pca.transform(gp.scaler_x.transform(X_pd[idx_te]))
+        # ARD length-scales (k1__k2__length_scale = PCA空間での各軸の長さスケール)
+        ard_ls = np.array(gp.gpr.kernel_.get_params()["k1__k2__length_scale"],
+                          dtype=np.float64)
+        # ARD スケーリング: 距離 = Σ ((x_i - x_j)_d / l_d)^2
+        X_tr_ard = X_tr_pca / ard_ls[np.newaxis, :]
+        X_te_ard = X_te_pca / ard_ls[np.newaxis, :]
+        nw_b3 = NWDescriptorRegressor(length_scale=1.0)
+        nw_b3.fit(X_tr_ard, y_tr)
+        t0 = time.time()
+        preds_b3 = [nw_b3.predict(X_te_ard[i], k=min(50, n_train-1))[0]
+                    for i in range(N_te)]
+        t_b3 = (time.time() - t0) / N_te * 1000
+        mae_b3 = np.mean(np.abs(np.array(preds_b3) - y_te)) * KCAL
+        print(f"  MAE={mae_b3:.3f} kcal  infer={t_b3:.3f}ms/call  "
+              f"(PCA {X_tr_pca.shape[1]}dim, ARD {len(ard_ls)}ls)")
+    except Exception as e:
+        import traceback
+        print(f"  エラー: {e}")
+        traceback.print_exc()
+        mae_b3 = float("inf"); t_b3 = 0.0
 
     # ── [B2] NW on pairwise_desc (GPと同一特徴量) ──
     print("\n  [B2] NW on pairwise_desc (same features as GP)")
@@ -504,7 +553,8 @@ def exp_gp_free():
     print("\n  [D] RoutingPredictor (3-level routing)")
     router = RoutingPredictor(sim_exact=0.995, sim_novel=0.70)
     t0 = time.time()
-    router.fit(encoder, scaler, mols_tr, y_tr, nw_tau=best_tau)
+    router.fit(encoder, scaler, mols_tr, y_tr, nw_tau=best_l,
+               desc_scaler=desc_scaler)
     t_router_fit = time.time() - t0
 
     preds_d, sigs_d, levels_d, sims_d = [], [], [], []
@@ -544,7 +594,8 @@ def exp_gp_free():
     print("\n" + "=" * 65)
     print("★ GP 削除の効果")
     print("=" * 65)
-    print(f"  [A]   Global GP                     : MAE={mae_a:.3f} kcal  {t_gp_inf:.1f}ms/call")
+    print(f"  [A]   Global GP  (ARD Matérn 5/2)    : MAE={mae_a:.3f} kcal  {t_gp_inf:.1f}ms/call")
+    print(f"  [B3]  NW(GP-calibrated ARD)         : MAE={mae_b3:.3f} kcal  {t_b3:.3f}ms/call")
     print(f"  [B2]  NW on pairwise_desc (l-tuned) : MAE={mae_b2:.3f} kcal  {t_nw_d:.3f}ms/call  "
           f"({t_gp_inf/t_nw_d:.0f}× faster)")
     print(f"  [C2]  NW(desc) + 残差NN ({n_p_c2}p)    : MAE={mae_c2:.3f} kcal  "
