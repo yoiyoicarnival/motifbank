@@ -1,0 +1,92 @@
+{
+  "n_fragments": 172,
+  "n_train": 120,
+  "n_test": 34,
+  "learning_curve": {
+    "10": {
+      "mae_kcal": 4.364470834719886,
+      "mae_mHa": 6.955226709268762,
+      "rmse_kcal": 4.88307302154863
+    },
+    "20": {
+      "mae_kcal": 3.603120017742715,
+      "mae_mHa": 5.741937002934162,
+      "rmse_kcal": 4.108399265847261
+    },
+    "40": {
+      "mae_kcal": 3.2623165899587234,
+      "mae_mHa": 5.198832192912973,
+      "rmse_kcal": 3.72869426963203
+    },
+    "80": {
+      "mae_kcal": 2.2750826412277565,
+      "mae_mHa": 3.625574817955356,
+      "rmse_kcal": 2.654302754082783
+    },
+    "120": {
+      "mae_kcal": 0.5113207386958057,
+      "mae_mHa": 0.8148414306011394,
+      "rmse_kcal": 0.6695644273719621
+    }
+  },
+  "calibration": {
+    "coverage_1sig": 0.38235294117647056,
+    "coverage_2sig": 0.6764705882352942,
+    "coverage_3sig": 0.9411764705882353,
+    "spearman_rho": 0.5813598166539343,
+    "spearman_p": 0.0003113007255429937,
+    "ece_mHa": 0.6659639964264005,
+    "mae_in_2sig_kcal": 0.6203852808724925
+  },
+  "mlpred": {
+    "0.0001": {
+      "ml_pred_rate": 0.0,
+      "mae_kcal": NaN,
+      "qc_save_pct": 0.0
+    },
+    "0.0005": {
+      "ml_pred_rate": 0.058823529411764705,
+      "mae_kcal": 0.585528923044342,
+      "qc_save_pct": 5.88235294117647
+    },
+    "0.001": {
+      "ml_pred_rate": 0.5588235294117647,
+      "mae_kcal": 0.6515208356915174,
+      "qc_save_pct": 55.88235294117647
+    },
+    "0.002": {
+      "ml_pred_rate": 1.0,
+      "mae_kcal": 1.0230655404036713,
+      "qc_save_pct": 100.0
+    },
+    "0.005": {
+      "ml_pred_rate": 1.0,
+      "mae_kcal": 1.0230655404036713,
+      "qc_save_pct": 100.0
+    },
+    "0.01": {
+      "ml_pred_rate": 1.0,
+      "mae_kcal": 1.0230655404036713,
+      "qc_save_pct": 100.0
+    },
+    "0.02": {
+      "ml_pred_rate": 1.0,
+      "mae_kcal": 1.0230655404036713,
+      "qc_save_pct": 100.0
+    },
+    "0.05": {
+      "ml_pred_rate": 1.0,
+      "mae_kcal": 1.0230655404036713,
+      "qc_save_pct": 100.0
+    }
+  },
+  "verdict": {
+    "chem_pass": true,
+    "goal_pass": false,
+    "calib_pass": false,
+    "ml_pass": true,
+    "all_pass": false,
+    "mae_best_kcal": 0.5113207386958057,
+    "best_threshold": 0.001
+  }
+}
