@@ -83,35 +83,101 @@ class NWRegressor:
         return mu, sigma
 
 
-class NWDescriptorRegressor:
+class LocalLinearRegressor:
     """
-    NW smoother using pairwise_desc directly (same features as GP).
-    RBF kernel (Gaussian) in descriptor space: sim = exp(-||x-x_i||²/(2l²))
-    l (length scale) is tuned once on validation set.
+    Local Linear Regression: k-NNの近傍でWLS (Weighted Least Squares) を解く。
+      モデル: E(x) ≈ β^T x + β_0 (局所線形)
+      重み:   w_i = exp(-||x-x_i||²/(2l²))  ← Gaussian
+      解:     β = (X_k^T W X_k + λI)^{-1} X_k^T W E_k
+
+    NW(0次): 加重平均 → 局所定数モデル
+    LLR(1次): 加重線形回帰 → 局所線形モデル (より正確)
+
+    GP との比較:
+      GP:  O(N³) fit, O(N) predict, グローバル最適解
+      LLR: O(k²D) predict, fit不要, 局所最適解
     """
-    def __init__(self, length_scale=1.0):
-        self.l  = length_scale
-        self.X  = None   # (N, D) raw descriptors (standardized)
-        self.E  = None
+    def __init__(self, length_scale=1.0, ridge=1e-4):
+        self.l     = length_scale
+        self.ridge = ridge
+        self.X     = None   # (N, D) standardized
+        self.E     = None
 
     def fit(self, X, E):
         self.X = np.asarray(X, dtype=np.float64)
         self.E = np.asarray(E, dtype=np.float64)
 
     def predict(self, x, k=50):
-        dists2 = np.sum((self.X - x.astype(np.float64)) ** 2, axis=1)
-        k_eff  = min(k, len(self.E))
+        dists2  = np.sum((self.X - x.astype(np.float64)) ** 2, axis=1)
+        k_eff   = min(k, len(self.E))
         top_idx = np.argpartition(dists2, k_eff)[:k_eff]
-        d2_k   = dists2[top_idx]
-        E_k    = self.E[top_idx]
+        X_k     = self.X[top_idx]       # (k, D)
+        E_k     = self.E[top_idx]       # (k,)
+        d2_k    = dists2[top_idx]
+
         w = np.exp(-d2_k / (2 * self.l ** 2))
         w_sum = w.sum()
-        if w_sum < 1e-300:   # all neighbors too far → uniform
-            w = np.ones(k_eff, dtype=np.float64) / k_eff
+        if w_sum < 1e-300:
+            return float(np.mean(E_k)), float(np.std(E_k))
+        w = w / w_sum
+
+        # Augment with bias: X_aug ∈ R^{k×(D+1)}
+        X_aug = np.column_stack([X_k, np.ones(k_eff)])
+        x_aug = np.append(x, 1.0)
+        W_mat = np.diag(w)
+
+        XTWX = X_aug.T @ W_mat @ X_aug
+        XTWX[np.diag_indices_from(XTWX)] += self.ridge  # ridge
+        XTWy = X_aug.T @ (w * E_k)
+        try:
+            beta = np.linalg.solve(XTWX, XTWy)
+        except np.linalg.LinAlgError:
+            # フォールバック: NW
+            return float(np.dot(w, E_k)), 0.0
+
+        mu   = float(x_aug @ beta)
+        resid = E_k - (X_aug @ beta)
+        sigma = float(np.sqrt(max(0.0, np.dot(w, resid ** 2))))
+        return mu, sigma
+
+
+class NWDescriptorRegressor:
+    """
+    NW smoother on pairwise_desc.
+    kernel: "rbf" (Gaussian) or "matern52" (Matérn 5/2, same as GP)
+    """
+    def __init__(self, length_scale=1.0, kernel="rbf"):
+        self.l      = length_scale
+        self.kernel = kernel
+        self.X      = None
+        self.E      = None
+
+    def fit(self, X, E):
+        self.X = np.asarray(X, dtype=np.float64)
+        self.E = np.asarray(E, dtype=np.float64)
+
+    def _weights(self, dists2, k_eff):
+        r = np.sqrt(np.maximum(dists2, 0.0)) / self.l   # (k,)
+        if self.kernel == "matern52":
+            # Matérn 5/2: k(r) = (1 + √5·r + 5r²/3) exp(-√5·r)
+            sqrt5r = np.sqrt(5.0) * r
+            w = (1.0 + sqrt5r + sqrt5r**2 / 3.0) * np.exp(-sqrt5r)
         else:
-            w /= w_sum
-        mu    = float(np.dot(w, E_k))
-        sigma = float(np.sqrt(np.dot(w, (E_k - mu) ** 2)))
+            w = np.exp(-dists2 / (2.0 * self.l ** 2))   # Gaussian
+        w_sum = w.sum()
+        if w_sum < 1e-300:
+            return np.ones(k_eff) / k_eff
+        return w / w_sum
+
+    def predict(self, x, k=50):
+        dists2  = np.sum((self.X - x.astype(np.float64)) ** 2, axis=1)
+        k_eff   = min(k, len(self.E))
+        top_idx = np.argpartition(dists2, k_eff)[:k_eff]
+        d2_k    = dists2[top_idx]
+        E_k     = self.E[top_idx]
+        w       = self._weights(d2_k, k_eff)
+        mu      = float(np.dot(w, E_k))
+        sigma   = float(np.sqrt(np.dot(w, (E_k - mu) ** 2)))
         return mu, sigma
 
 
@@ -428,14 +494,63 @@ def exp_gp_free():
         traceback.print_exc()
         mae_b3 = float("inf"); t_b3 = 0.0
 
-    # ── [B2] NW on pairwise_desc (GPと同一特徴量) ──
-    print("\n  [B2] NW on pairwise_desc (same features as GP)")
-    # length_scale チューニング
+    # バリデーション分割 (B2/B4で共用)
     n_val = 40
     X_sub_tr  = X_tr_sc[:n_train - n_val]
     X_sub_val = X_tr_sc[n_train - n_val:]
     y_sub_tr  = y_tr[:n_train - n_val]
     y_sub_val = y_tr[n_train - n_val:]
+
+    # ── [B4] LLR on pairwise_desc (局所線形回帰) ──
+    print("\n  [B4] Local Linear Regression on pairwise_desc")
+    # length_scale チューニング (LLR)
+    best_ll, best_ll_mae = 1.0, float("inf")
+    llr_tmp = LocalLinearRegressor()
+    llr_tmp.fit(X_sub_tr, y_sub_tr)
+    for ls in [0.5, 1.0, 2.0, 4.0, 8.0, 16.0]:
+        llr_tmp.l = ls
+        ps = [llr_tmp.predict(X_sub_val[i], k=50)[0]
+              for i in range(len(y_sub_val))]
+        mae_v = np.mean(np.abs(np.array(ps) - y_sub_val)) * KCAL
+        if mae_v < best_ll_mae:
+            best_ll_mae, best_ll = mae_v, ls
+    print(f"  l={best_ll:.1f}  val_MAE={best_ll_mae:.3f} kcal")
+    llr = LocalLinearRegressor(length_scale=best_ll)
+    llr.fit(X_tr_sc, y_tr)
+    t0 = time.time()
+    preds_b4, sigs_b4 = [], []
+    for i in range(N_te):
+        mu, sig = llr.predict(X_te_sc[i], k=50)
+        preds_b4.append(mu); sigs_b4.append(sig)
+    t_llr = (time.time() - t0) / N_te * 1000
+    mae_b4 = np.mean(np.abs(np.array(preds_b4) - y_te)) * KCAL
+    print(f"  MAE={mae_b4:.3f} kcal  infer={t_llr:.3f}ms/call  speedup vs GP: {t_gp_inf/t_llr:.0f}×")
+
+    # ── [B4p] LLR on PCA-20 (GPと同一空間) ──
+    print("\n  [B4p] LLR on PCA-20 (GP's internal space)")
+    X_tr_p = gp.pca.transform(gp.scaler_x.transform(X_pd[idx_tr]))
+    X_te_p = gp.pca.transform(gp.scaler_x.transform(X_pd[idx_te]))
+    best_lp, best_lp_mae = 1.0, float("inf")
+    llr_p_tmp = LocalLinearRegressor()
+    llr_p_tmp.fit(X_tr_p[:n_train-n_val], y_sub_tr)
+    for ls in [0.5, 1.0, 2.0, 4.0, 8.0, 16.0]:
+        llr_p_tmp.l = ls
+        ps = [llr_p_tmp.predict(X_tr_p[n_train-n_val+i], k=50)[0]
+              for i in range(n_val)]
+        mae_v = np.mean(np.abs(np.array(ps) - y_sub_val)) * KCAL
+        if mae_v < best_lp_mae:
+            best_lp_mae, best_lp = mae_v, ls
+    llr_p = LocalLinearRegressor(length_scale=best_lp)
+    llr_p.fit(X_tr_p, y_tr)
+    t0 = time.time()
+    preds_b4p = [llr_p.predict(X_te_p[i], k=50)[0] for i in range(N_te)]
+    t_llrp = (time.time() - t0) / N_te * 1000
+    mae_b4p = np.mean(np.abs(np.array(preds_b4p) - y_te)) * KCAL
+    print(f"  l={best_lp:.1f}  MAE={mae_b4p:.3f} kcal  infer={t_llrp:.3f}ms/call  "
+          f"speedup vs GP: {t_gp_inf/t_llrp:.0f}×")
+
+    # ── [B2] NW on pairwise_desc (GPと同一特徴量) ──
+    print("\n  [B2] NW on pairwise_desc (same features as GP)")
     best_l, best_l_mae = 1.0, float("inf")
     nw_d_tmp = NWDescriptorRegressor()
     nw_d_tmp.fit(X_sub_tr, y_sub_tr)
@@ -458,6 +573,27 @@ def exp_gp_free():
     mae_b2 = np.mean(np.abs(np.array(preds_b2) - y_te)) * KCAL
     print(f"  MAE={mae_b2:.3f} kcal  infer={t_nw_d:.3f}ms/call  "
           f"speedup vs GP: {t_gp_inf/t_nw_d:.0f}×")
+
+    # ── [B2m] NW with Matérn-5/2 (GPと同一カーネル) ──
+    print("\n  [B2m] NW with Matérn-5/2 kernel (same kernel as GP)")
+    best_lm, best_lm_mae = 1.0, float("inf")
+    nw_m_tmp = NWDescriptorRegressor(kernel="matern52")
+    nw_m_tmp.fit(X_sub_tr, y_sub_tr)
+    for ls in [0.5, 1.0, 2.0, 4.0, 8.0, 16.0]:
+        nw_m_tmp.l = ls
+        ps = [nw_m_tmp.predict(X_sub_val[i], k=50)[0]
+              for i in range(len(y_sub_val))]
+        mae_v = np.mean(np.abs(np.array(ps) - y_sub_val)) * KCAL
+        if mae_v < best_lm_mae:
+            best_lm_mae, best_lm = mae_v, ls
+    nw_m = NWDescriptorRegressor(length_scale=best_lm, kernel="matern52")
+    nw_m.fit(X_tr_sc, y_tr)
+    t0 = time.time()
+    preds_b2m = [nw_m.predict(X_te_sc[i], k=50)[0] for i in range(N_te)]
+    t_nw_m = (time.time() - t0) / N_te * 1000
+    mae_b2m = np.mean(np.abs(np.array(preds_b2m) - y_te)) * KCAL
+    print(f"  l={best_lm:.1f}  MAE={mae_b2m:.3f} kcal  infer={t_nw_m:.3f}ms/call  "
+          f"vs RBF: {mae_b2:.3f}")
 
     # ── τ チューニング for embed-NW (1 回だけ) ──
     print("\n  NW(embed) τ チューニング ...", end=" ", flush=True)
@@ -574,21 +710,45 @@ def exp_gp_free():
           f"L1r(NW+corr)={level_counts.get('1r',0)} "
           f"L2(DFT)={level_counts.get(2,0)}")
 
-    # ── σ 較正チェック ──
-    print("\n  σ 較正チェック (NW uncertainty):")
-    errs = np.abs(np.array(preds_b) - y_te) * KCAL
-    sigs_kcal = np.array(sigs_b) * KCAL
+    # ── σ 較正チェック (3種の不確かさ比較) ──
+    print("\n  σ 較正チェック:")
     from scipy.stats import spearmanr
-    rho, p = spearmanr(sigs_kcal, errs)
-    print(f"  ρ(σ, |err|) = {rho:+.3f}  p={p:.3e}  "
-          f"{'✓ 有意' if p < 0.05 else '✗ 非有意'}")
-    # σ 閾値別の誤検知率
-    for thresh_kcal in [0.5, 1.0, 2.0]:
-        flag = sigs_kcal > thresh_kcal
-        if flag.sum() > 0:
-            prec = (errs[flag] > 0.5).mean()  # 実際に誤差が大きい割合
-            print(f"  σ>{thresh_kcal:.1f}: {flag.sum()}/{N_te} flagged, "
-                  f"precision={prec:.2f}")
+    errs = np.abs(np.array(preds_b2) - y_te) * KCAL   # [B2] NW誤差
+
+    # 1) NW weighted std (従来)
+    sigs_nw = np.array(sigs_b2) * KCAL
+    rho_nw, p_nw = spearmanr(sigs_nw, errs)
+
+    # 2) 最近傍距離 (nn_dist)
+    nn_dists = np.array([
+        np.sqrt(np.min(np.sum((X_tr_sc - X_te_sc[i]) ** 2, axis=1)))
+        for i in range(N_te)
+    ])
+    rho_d, p_d = spearmanr(nn_dists, errs)
+
+    # 3) GP posterior std
+    gp_sigs = np.array([gp.predict(X_pd[idx_te[i]], n_atoms=9)[1] for i in range(N_te)]) * KCAL
+    rho_gp, p_gp = spearmanr(gp_sigs, errs)
+
+    print(f"  NW weighted-std: ρ={rho_nw:+.3f} p={p_nw:.3e} "
+          f"{'✓' if p_nw < 0.05 else '✗'}")
+    print(f"  nn_dist:         ρ={rho_d:+.3f} p={p_d:.3e} "
+          f"{'✓' if p_d < 0.05 else '✗'}  ← ルーティング推奨")
+    print(f"  GP posterior-σ:  ρ={rho_gp:+.3f} p={p_gp:.3e} "
+          f"{'✓' if p_gp < 0.05 else '✗'}  (参考: 最良σ)")
+
+    # nn_dist を使った閾値別精度
+    print(f"\n  nn_dist 閾値別ルーティング精度 (NW誤差):")
+    q50 = np.percentile(nn_dists, 50)
+    q75 = np.percentile(nn_dists, 75)
+    for thresh in [q50, q75]:
+        flag = nn_dists > thresh
+        n_flag = flag.sum()
+        if n_flag > 0:
+            prec = (errs[flag] > 1.0).mean()
+            print(f"  d>p{int(100*(thresh-nn_dists.min())/(nn_dists.max()-nn_dists.min()+1e-10)):0d} "
+                  f"({thresh:.2f}): {n_flag}/{N_te} DFT送り, "
+                  f"precision={prec:.2f} (誤差>1kcal率)")
 
     # ── サマリ ──
     print("\n" + "=" * 65)
@@ -596,7 +756,10 @@ def exp_gp_free():
     print("=" * 65)
     print(f"  [A]   Global GP  (ARD Matérn 5/2)    : MAE={mae_a:.3f} kcal  {t_gp_inf:.1f}ms/call")
     print(f"  [B3]  NW(GP-calibrated ARD)         : MAE={mae_b3:.3f} kcal  {t_b3:.3f}ms/call")
-    print(f"  [B2]  NW on pairwise_desc (l-tuned) : MAE={mae_b2:.3f} kcal  {t_nw_d:.3f}ms/call  "
+    print(f"  [B4p] LLR on PCA-20 (GP空間)       : MAE={mae_b4p:.3f} kcal  {t_llrp:.3f}ms/call")
+    print(f"  [B4]  LLR on pairwise_desc          : MAE={mae_b4:.3f} kcal  {t_llr:.3f}ms/call")
+    print(f"  [B2m] NW Matérn-5/2 (same as GP)   : MAE={mae_b2m:.3f} kcal  {t_nw_m:.3f}ms/call")
+    print(f"  [B2]  NW RBF on pairwise_desc       : MAE={mae_b2:.3f} kcal  {t_nw_d:.3f}ms/call  "
           f"({t_gp_inf/t_nw_d:.0f}× faster)")
     print(f"  [C2]  NW(desc) + 残差NN ({n_p_c2}p)    : MAE={mae_c2:.3f} kcal  "
           f"{t_nw_d+t_rc2_inf:.3f}ms/call")
