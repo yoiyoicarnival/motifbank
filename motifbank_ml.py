@@ -44,12 +44,11 @@ from motifbank_cli import (
 RDF_BINS   = 64    # 距離ヒストグラムのビン数
 RDF_R_MAX  = 8.0   # 最大距離 (Å)
 EMBED_DIM  = 32    # 埋め込み次元
+ELEM_BINS  = 64    # 元素ペア別ヒストグラムのビン数
+ELEM_DIM   = ELEM_BINS * 3  # Si-Si + Si-O + O-O → 192次元
 
 def rdf_descriptor(mol_list, n_bins=RDF_BINS, r_max=RDF_R_MAX):
-    """
-    フラグメント → 固定長 RDF ヒストグラム記述子
-    原子サイズ非依存・回転平行移動不変
-    """
+    """フラグメント → 固定長 RDF ヒストグラム (元素非依存・後方互換)"""
     pts = np.vstack(mol_list)
     dists = [np.linalg.norm(pts[i] - pts[j])
              for i, j in itertools.combinations(range(len(pts)), 2)]
@@ -60,9 +59,51 @@ def rdf_descriptor(mol_list, n_bins=RDF_BINS, r_max=RDF_R_MAX):
     norm = max(hist.sum(), 1)
     return hist.astype(np.float32) / norm
 
+def infer_atom_types_sioh4(mol_list):
+    """si_oh4 mol_list: 各 SiO4 ユニット = [Si, O, O, O, O] → index%5==0 が Si"""
+    return ['Si' if i % 5 == 0 else 'O' for i in range(len(mol_list))]
+
+def element_aware_descriptor(mol_list, n_bins=ELEM_BINS, r_max=RDF_R_MAX,
+                               atom_types=None):
+    """
+    元素ペア別 RDF 記述子 (Si-Si / Si-O / O-O の 3 チャンネル)
+    si_oh4 フォーマット前提: index%5==0 = Si, その他 = O
+    出力: (3*n_bins,) = 192次元 固定長
+    """
+    pts = np.array(mol_list, dtype=np.float32)
+    n   = len(pts)
+    if atom_types is None:
+        atom_types = infer_atom_types_sioh4(mol_list)
+
+    hist_ss = np.zeros(n_bins, dtype=np.float32)
+    hist_so = np.zeros(n_bins, dtype=np.float32)
+    hist_oo = np.zeros(n_bins, dtype=np.float32)
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            r = float(np.linalg.norm(pts[i] - pts[j]))
+            if r <= 0 or r > r_max:
+                continue
+            b  = min(int(r / r_max * n_bins), n_bins - 1)
+            ti = atom_types[i]
+            tj = atom_types[j]
+            if ti == tj == 'Si':
+                hist_ss[b] += 1.0
+            elif ti == tj == 'O':
+                hist_oo[b] += 1.0
+            else:
+                hist_so[b] += 1.0
+
+    for h in (hist_ss, hist_so, hist_oo):
+        s = h.sum()
+        if s > 0:
+            h /= s
+
+    return np.concatenate([hist_ss, hist_so, hist_oo])
+
 def rdf_batch(mol_list_list):
-    """フラグメントリスト → (N, RDF_BINS) ndarray"""
-    return np.vstack([rdf_descriptor(m) for m in mol_list_list])
+    """フラグメントリスト → (N, ELEM_DIM) ndarray (element-aware)"""
+    return np.vstack([element_aware_descriptor(m) for m in mol_list_list])
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -70,7 +111,7 @@ def rdf_batch(mol_list_list):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class FragmentAutoencoder(nn.Module):
-    def __init__(self, in_dim=RDF_BINS, embed_dim=EMBED_DIM):
+    def __init__(self, in_dim=ELEM_DIM, embed_dim=EMBED_DIM):
         super().__init__()
         self.encoder = nn.Sequential(
             nn.Linear(in_dim, 128), nn.ReLU(),
@@ -319,6 +360,101 @@ class EnsembleEnergyPredictor:
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# §4b. GPEnergyPredictor — Gaussian Process (小データ特化)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class GPEnergyPredictor:
+    """
+    Gaussian Process エネルギー予測器
+    <100 点で MLP Ensemble より高精度 (Perplexity推奨)
+    pipeline: 入力記述子 → StandardScaler → PCA → Matérn 5/2 GP
+    per-atom 正規化でモノマー/ペア/トリマー混在に対応
+    """
+
+    def __init__(self):
+        self.gpr      = None
+        self.pca      = None
+        self.scaler_x = StandardScaler()
+        self.e_mean   = 0.0
+        self.e_std    = 1.0
+        self.trained  = False
+
+    def fit(self, descriptors, energies, n_atoms_list=None, verbose=True):
+        from sklearn.gaussian_process import GaussianProcessRegressor
+        from sklearn.gaussian_process.kernels import (
+            Matern, WhiteKernel, ConstantKernel as C,
+        )
+        from sklearn.decomposition import PCA
+
+        n = len(descriptors)
+        if n < 4:
+            return self
+
+        X = np.array(descriptors, dtype=np.float64)
+        y = np.array(energies,    dtype=np.float64)
+
+        # per-atom 正規化: モノマー(5原子)とトリマー(15原子)のスケール差を吸収
+        na = np.array(n_atoms_list, dtype=np.float64) if n_atoms_list else np.ones(n)
+        y_pa = y / na
+        self.e_mean = float(y_pa.mean())
+        self.e_std  = float(max(y_pa.std(), 1e-8))
+        y_norm = (y_pa - self.e_mean) / self.e_std
+
+        # PCA で次元削減: curse-of-dimensionality 回避
+        X_s = self.scaler_x.fit_transform(X)
+        n_comp = min(n - 1, X.shape[1], 20)
+        if n_comp < X.shape[1]:
+            self.pca = PCA(n_components=n_comp, random_state=42)
+            X_red = self.pca.fit_transform(X_s)
+        else:
+            self.pca = None
+            X_red = X_s
+
+        # ARD Matérn 5/2 kernel (各 PCA 軸に独立 length-scale)
+        ls0    = np.ones(X_red.shape[1])
+        kernel = (
+            C(1.0, (1e-6, 1e6)) *
+            Matern(length_scale=ls0, length_scale_bounds=(1e-4, 1e6), nu=2.5) +
+            WhiteKernel(noise_level=1e-2, noise_level_bounds=(1e-10, 1e4))
+        )
+        self.gpr = GaussianProcessRegressor(
+            kernel=kernel, n_restarts_optimizer=3,
+            normalize_y=False, alpha=0.0,
+        )
+        import warnings as _w
+        from sklearn.exceptions import ConvergenceWarning as _CW
+        with _w.catch_warnings():
+            _w.filterwarnings("ignore", category=_CW)
+            self.gpr.fit(X_red, y_norm)
+        self.trained = True
+
+        if verbose:
+            y_hat, _ = self.gpr.predict(X_red, return_std=True)
+            mae_pa   = float(np.mean(np.abs(y_hat - y_norm))) * self.e_std
+            print(f"  GP train MAE = {mae_pa:.4e} Ha/atom  n={n}")
+
+        return self
+
+    def _transform(self, descriptor):
+        X = np.array(descriptor, dtype=np.float64).reshape(1, -1)
+        X_s = self.scaler_x.transform(X)
+        if self.pca is not None:
+            X_s = self.pca.transform(X_s)
+        return X_s
+
+    def predict(self, descriptor, n_atoms=None):
+        """Returns: (e_pred_Ha, sigma_Ha)"""
+        if not self.trained:
+            return 0.0, float('inf')
+        X_red = self._transform(descriptor)
+        y_norm, sig_norm = self.gpr.predict(X_red, return_std=True)
+        na    = float(n_atoms) if n_atoms else 1.0
+        e_pa  = float(y_norm[0]) * self.e_std + self.e_mean
+        sig_pa = float(sig_norm[0]) * self.e_std
+        return e_pa * na, sig_pa * na
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # §5. FragmentCluster — 教師なしクラスタリング
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -395,6 +531,35 @@ class FragmentCluster:
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# §5b. Farthest-Point Sampling — core-set 初期シード選択
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def farthest_point_sampling(X, n_select, seed=42):
+    """
+    貪欲 farthest-point sampling (core-set)
+    現在の選択集合から最も遠い点を順次追加する。
+    K-means centroid より多様性が高く、能動学習の初期シードに最適。
+    O(N * n_select) で効率的。
+    """
+    n = len(X)
+    if n_select >= n:
+        return list(range(n))
+    rng = np.random.RandomState(seed)
+    selected = [int(rng.randint(0, n))]
+    min_dists = np.full(n, np.inf)
+
+    for _ in range(n_select - 1):
+        last = selected[-1]
+        dists = np.linalg.norm(X - X[last], axis=1)
+        min_dists = np.minimum(min_dists, dists)
+        min_dists[selected] = -np.inf  # 選択済みを除外
+        next_idx = int(np.argmax(min_dists))
+        selected.append(next_idx)
+
+    return selected
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # §6. MLBank — MotifBank + ML を統合
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -408,17 +573,22 @@ class MLBank(MotifBank):
     """
     def __init__(self, path=None, sigma_threshold=1e-3):
         super().__init__(path)
-        self.autoencoder = None
-        self.predictor   = EnsembleEnergyPredictor()
+        self.autoencoder  = None
+        self.predictor    = GPEnergyPredictor()       # GP (primary)
+        self.ensemble     = EnsembleEnergyPredictor() # MLP ensemble (fallback/comparison)
         self.adaptive_eps = AdaptiveEpsilon(tol_ha=1e-4)
-        self.cluster     = FragmentCluster()
+        self.cluster      = FragmentCluster()
         self.sigma_threshold = sigma_threshold   # Ha
-        self._mol_cache  = []    # (mol_list, energy) for ML training
+        self._mol_cache   = []
         self.stats = {'exact': 0, 'soft': 0, 'ml_pred': 0, 'qc': 0}
 
+    def _desc(self, mol_list):
+        """フラグメント → 元素別 RDF 記述子 (192次元)"""
+        return element_aware_descriptor(mol_list)
+
     def _embed(self, mol_list):
-        """フラグメント → 32次元埋め込み"""
-        desc = rdf_descriptor(mol_list)
+        """フラグメント → 32次元埋め込み (autoencoder 経由)"""
+        desc = element_aware_descriptor(mol_list)
         xt   = torch.tensor(desc, dtype=torch.float32).unsqueeze(0)
         if self.autoencoder is not None:
             self.autoencoder.eval()
@@ -442,17 +612,17 @@ class MLBank(MotifBank):
 
         print(f"\n[ML] Training on {len(mols_list)} bank fragments...")
 
-        # (1) RDF descriptor
-        descs = np.array([rdf_descriptor(m) for m in mols_list], dtype=np.float32)
+        # (1) Element-aware descriptor (Si-Si/Si-O/O-O 3チャンネル)
+        descs = np.array([element_aware_descriptor(m) for m in mols_list], dtype=np.float32)
 
-        # (2) Autoencoder (教師なし)
-        print("  (1/4) Autoencoder (unsupervised)...")
+        # (2) Autoencoder (教師なし, 可視化・soft-match 用)
+        print("  (1/4) Autoencoder (unsupervised, 192→32)...")
         self.autoencoder = train_autoencoder(descs, epochs=200, verbose=verbose)
 
-        # (3) 埋め込み
+        # (3) 埋め込み (クラスタリング用)
         self.autoencoder.eval()
         with torch.no_grad():
-            Xt = torch.tensor(descs)
+            Xt     = torch.tensor(descs)
             embeds = self.autoencoder.encode(Xt).numpy()
 
         # (4) クラスタリング (教師なし)
@@ -468,9 +638,15 @@ class MLBank(MotifBank):
         print(f"    ε(95% safe) = {eps_95:.4f} Å  ε(99% safe) = {eps_99:.4f} Å  "
               f"(current fixed = 0.10 Å)")
 
-        # (6) Ensemble predictor
-        print("  (4/4) Ensemble predictor...")
-        self.predictor.fit(list(embeds), energies, epochs=300, verbose=verbose)
+        # (6) GP predictor (element-aware desc + PCA → GP)
+        print("  (4/4) GP energy predictor (Matern 5/2, per-atom normalization)...")
+        n_atoms_list = [len(m) for m in mols_list]
+        self.predictor = GPEnergyPredictor()
+        self.predictor.fit(list(descs), energies,
+                           n_atoms_list=n_atoms_list, verbose=verbose)
+
+        # (6b) Ensemble as fallback/comparison
+        self.ensemble.fit(list(embeds), energies, epochs=200, verbose=False)
 
         print("[ML] Training complete.\n")
         return self
@@ -497,9 +673,10 @@ class MLBank(MotifBank):
             self.stats['soft'] += 1
             return soft, f'soft(ε={eps:.3f})', 0.0
 
-        # 3. ML prediction
-        emb = self._embed(mol_list)
-        e_pred, sigma = self.predictor.predict(emb)
+        # 3. ML prediction (GP on element-aware descriptor)
+        desc    = self._desc(mol_list)
+        n_atoms = len(mol_list)
+        e_pred, sigma = self.predictor.predict(desc, n_atoms=n_atoms)
         if self.predictor.trained and sigma < self.sigma_threshold:
             self.stats['ml_pred'] += 1
             return e_pred, f'ml_pred(σ={sigma:.2e})', sigma
@@ -613,20 +790,14 @@ class ActiveLearner:
         n = len(mols)
         print(f"\n[ActiveLearner] N={n} fragments, budget={self.budget} QC calls")
 
-        # ── Phase 1: 多様性シードで初期 bank 構築 ──
+        # ── Phase 1: Farthest-point sampling (core-set) で初期 bank 構築 ──
         seed_n = min(max(self.budget // 5, 3), n)
-        # RDF でクラスタリングしてシードを選ぶ
-        descs = rdf_batch(mols)
-        km    = KMeans(n_clusters=seed_n, random_state=0, n_init=5)
-        km.fit(descs)
-        seed_idx = []
-        for c in range(seed_n):
-            members = np.where(km.labels_ == c)[0]
-            if len(members) == 0:
-                continue
-            dists = np.linalg.norm(descs[members] - km.cluster_centers_[c], axis=1)
-            seed_idx.append(int(members[np.argmin(dists)]))
-        if not seed_idx:  # fallback: random seed
+        # 元素別記述子空間で最も多様な点を選ぶ (K-means centroid より確実)
+        descs  = rdf_batch(mols)   # element_aware_descriptor を使用
+        scl    = StandardScaler()
+        X_scl  = scl.fit_transform(descs)
+        seed_idx = farthest_point_sampling(X_scl, seed_n, seed=42)
+        if not seed_idx:  # fallback
             seed_idx = list(np.random.choice(n, min(3, n), replace=False))
 
         if verbose:
@@ -645,11 +816,11 @@ class ActiveLearner:
         history   = []
 
         while calls_used < self.budget and remaining:
-            # 全残存フラグメントの不確実性を評価
+            # 全残存フラグメントの不確実性を評価 (GP用 _desc を使用)
             uncertainties = []
             for idx in remaining:
-                emb = bank._embed(mols[idx])
-                _, sigma = bank.predictor.predict(emb)
+                desc = bank._desc(mols[idx])
+                _, sigma = bank.predictor.predict(desc, n_atoms=len(mols[idx]))
                 uncertainties.append((sigma, idx))
 
             # 不確実性が最大のフラグメントを QC へ
@@ -673,11 +844,11 @@ class ActiveLearner:
             # 定期再訓練
             bank.train_ml(verbose=False)
 
-        # 残り全フラグメントは ML 予測で処理
+        # 残り全フラグメントは ML 予測で処理 (GP用 _desc を使用)
         n_ml_pred = 0
         for idx in remaining:
-            emb = bank._embed(mols[idx])
-            e_pred, sigma = bank.predictor.predict(emb)
+            desc = bank._desc(mols[idx])
+            e_pred, sigma = bank.predictor.predict(desc, n_atoms=len(mols[idx]))
             n_ml_pred += 1
 
         print(f"\n[ActiveLearner] Done.")
@@ -739,6 +910,80 @@ def _build_mbe_bank(cif, supercell, mol_type, r_cut=R_CUT_DEF):
     return bank, mols
 
 
+def learning_curve_benchmark(bank_mols, bank_energies, n_train_range=None,
+                              n_test=8, n_reps=5, verbose=True):
+    """
+    学習曲線ベンチマーク: GP (element-aware) vs MLP Ensemble (RDF)
+    MAE (Ha) vs QCコール数
+    Returns: (gp_curve, ens_curve) それぞれ [(n_train, mae), ...]
+    """
+    n_total = len(bank_mols)
+    if n_total < 8:
+        print("[LearningCurve] Not enough bank entries (need ≥8).")
+        return [], []
+
+    n_test = min(n_test, n_total - 4)
+    max_tr = n_total - n_test
+    if n_train_range is None:
+        n_train_range = [n for n in [4, 6, 8, 10, 12, 15, 18, 22, max_tr]
+                         if 4 <= n <= max_tr]
+
+    descs_ea  = np.array([element_aware_descriptor(m) for m in bank_mols])
+    descs_rdf = np.array([rdf_descriptor(m) for m in bank_mols])
+    energies  = np.array(bank_energies)
+    n_atoms   = np.array([len(m) for m in bank_mols], dtype=int)
+
+    gp_curve, ens_curve = [], []
+
+    if verbose:
+        print("\n[Learning Curve]  GP(element-aware+PCA) vs Ensemble(RDF)")
+        print(f"  {'n_train':>8}  {'GP MAE (Ha)':>14}  {'Ens MAE (Ha)':>14}")
+        print("  " + "-" * 42)
+
+    for n_tr in n_train_range:
+        gp_reps, ens_reps = [], []
+        for rep in range(n_reps):
+            rng = np.random.RandomState(rep * 137)
+            perm = rng.permutation(n_total)
+            tr, te = perm[:n_tr], perm[n_tr:n_tr + n_test]
+
+            # GP
+            gp = GPEnergyPredictor()
+            gp.fit(descs_ea[tr], energies[tr],
+                   n_atoms_list=n_atoms[tr].tolist(), verbose=False)
+            preds_gp = np.array([
+                gp.predict(descs_ea[i], int(n_atoms[i]))[0] for i in te
+            ])
+            gp_reps.append(float(np.mean(np.abs(preds_gp - energies[te]))))
+
+            # MLP Ensemble on RDF
+            ens = EnsembleEnergyPredictor(embed_dim=RDF_BINS)
+            ens.fit(descs_rdf[tr].tolist(), energies[tr].tolist(),
+                    epochs=150, verbose=False)
+            preds_ens = np.array([
+                ens.predict(descs_rdf[i])[0] for i in te
+            ])
+            ens_reps.append(float(np.mean(np.abs(preds_ens - energies[te]))))
+
+        gp_mae  = float(np.mean(gp_reps))
+        ens_mae = float(np.mean(ens_reps))
+        gp_curve.append((n_tr, gp_mae))
+        ens_curve.append((n_tr, ens_mae))
+        if verbose:
+            print(f"  {n_tr:>8}  {gp_mae:>14.4f}  {ens_mae:>14.4f}")
+
+    # 最良の改善率を表示
+    if gp_curve and ens_curve:
+        best_n = gp_curve[-1][0]
+        best_gp  = gp_curve[-1][1]
+        best_ens = ens_curve[-1][1]
+        ratio = best_ens / max(best_gp, 1e-12)
+        print(f"\n  [LC] @ n_train={best_n}: GP={best_gp:.4f} Ha, "
+              f"Ens={best_ens:.4f} Ha → GP is {ratio:.1f}× better")
+
+    return gp_curve, ens_curve
+
+
 def demo_ml(cif='examples/MFI_iza.cif', supercell=(1,1,1), mol_type='si_oh4'):
     print("=" * 60)
     print("MotifBank ML Demo")
@@ -781,13 +1026,20 @@ def demo_ml(cif='examples/MFI_iza.cif', supercell=(1,1,1), mol_type='si_oh4'):
         for s, cnt in Counter(sources).most_common():
             print(f"    {s:15s}: {cnt:4d} queries")
 
-    # ── 6. UMAP 可視化 ──
-    print("\n[6] UMAP visualization...")
+    # ── 6. 学習曲線ベンチマーク (GP vs Ensemble) ──
+    print("\n[6] Learning curve benchmark: GP vs MLP Ensemble...")
+    bank_mols  = [v['mol']       for v in bank.data.values() if 'mol' in v]
+    bank_enrgs = [v['energy_Ha'] for v in bank.data.values() if 'mol' in v]
+    gp_curve, ens_curve = learning_curve_benchmark(
+        bank_mols, bank_enrgs, n_reps=3, verbose=True
+    )
+
+    # ── 7. UMAP 可視化 ──
+    print("\n[7] UMAP visualization...")
     visualize_fragment_space(bank, title=f"MotifBank: {cif}", save="frag_space.png")
 
-    # ── 7. Active learning デモ ──
-    # 2x2x1 バンクの全ユニークフラグメントを target pool として使う
-    print("\n[7] Active learning on 25 unique MBE fragments (budget=15)...")
+    # ── 8. Active learning デモ (farthest-point seeding) ──
+    print("\n[8] Active learning (FPS seed) on unique MBE fragments (budget=15)...")
     unique_frags = [v['mol'] for v in bank.data.values() if 'mol' in v]
     print(f"    Pool size: {len(unique_frags)} unique fragments")
     al_bank3 = MLBank(sigma_threshold=5e-3)
