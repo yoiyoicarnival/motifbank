@@ -23,7 +23,8 @@ Usage:
 
 import os, sys, json, time, argparse, warnings
 os.environ["OMP_NUM_THREADS"] = "1"
-sys.path.insert(0, "/home/yoiyoi")
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _SCRIPT_DIR)
 
 import numpy as np
 from scipy.stats import spearmanr
@@ -41,7 +42,7 @@ from motifbank_ml import (
 KCAL = 627.5095   # Ha → kcal/mol
 MHA  = 1000.0     # Ha → mHa
 
-CACHE_FILE  = "/home/yoiyoi/real_gp_cache.json"
+CACHE_FILE  = os.path.join(_SCRIPT_DIR, "real_gp_cache.json")
 RESULT_FILE = "/home/yoiyoi/real_gp_results.json"
 
 # Si(OH)4 原子種 (9原子: Si O O O O H H H H)
@@ -59,13 +60,12 @@ def _load_eq_sioh4():
     """
     try:
         from motifbank_cli import from_cif as _from_cif
-        mols, _, _ = _from_cif('/home/yoiyoi/examples/MFI_iza.cif',
+        mols, _, _ = _from_cif(os.path.join(_SCRIPT_DIR, 'examples', 'MFI_iza.cif'),
                                 supercell=(1,1,1), mol_type='si_oh4', verbose=False)
         mol = np.array(mols[0], dtype=float)
     except Exception:
-        # フォールバック: cristobalite
         from motifbank_cli import from_cif as _from_cif
-        mols, _, _ = _from_cif('/home/yoiyoi/examples/cristobalite_alpha.cif',
+        mols, _, _ = _from_cif(os.path.join(_SCRIPT_DIR, 'examples', 'cristobalite_alpha.cif'),
                                 supercell=(2,2,1), mol_type='si_oh4', verbose=False)
         mol = np.array(mols[0], dtype=float)
     # 質量中心を原点へ
@@ -175,7 +175,7 @@ def collect_fragments(max_frags=300, verbose=True):
         ("examples/LTA_iza.cif",           (1, 1, 1), "LTA"),
         ("examples/cristobalite_alpha.cif", (2, 2, 1), "cristobalite"),
     ]
-    base = "/home/yoiyoi"
+    base = _SCRIPT_DIR
 
     unique = {}   # geom_key → (mol_array, source_name)
     if verbose:

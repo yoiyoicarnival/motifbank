@@ -24,7 +24,7 @@ Usage:
 
 import os, sys, json, warnings, time
 os.environ["OMP_NUM_THREADS"] = "1"
-sys.path.insert(0, "/home/yoiyoi")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 warnings.filterwarnings("ignore")
 
 import numpy as np
@@ -669,7 +669,8 @@ def main():
     r = exp_unsupervised_vs_supervised()
     demo_active_learning()
 
-    with open("/home/yoiyoi/world_encoder_results.json", "w") as f:
+    out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "world_encoder_results.json")
+    with open(out_path, "w") as f:
         json.dump(r, f, indent=2)
     print("\n結果保存: world_encoder_results.json")
 

@@ -24,7 +24,7 @@ Usage:
 
 import os, sys, json, warnings, time
 os.environ["OMP_NUM_THREADS"] = "1"
-sys.path.insert(0, "/home/yoiyoi")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 warnings.filterwarnings("ignore")
 
 import numpy as np
@@ -528,7 +528,8 @@ def main():
         "exp3_gamma_c": r3,
         "exp4_scaling": r4,
     }
-    with open("/home/yoiyoi/gamma_manifold_results.json", "w") as f:
+    _out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gamma_manifold_results.json")
+    with open(_out, "w") as f:
         import json as _json
         _json.dump(results, f, indent=2, default=float)
     print("結果保存: gamma_manifold_results.json")
