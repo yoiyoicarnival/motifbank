@@ -60,14 +60,30 @@ def rdf_descriptor(mol_list, n_bins=RDF_BINS, r_max=RDF_R_MAX):
     return hist.astype(np.float32) / norm
 
 def infer_atom_types_sioh4(mol_list):
-    """si_oh4 mol_list: 各 SiO4 ユニット = [Si, O, O, O, O] → index%5==0 が Si"""
-    return ['Si' if i % 5 == 0 else 'O' for i in range(len(mol_list))]
+    """
+    si_oh4 mol_list の原子種推定
+    from_cif が返す順序: 各 Si(OH)4 ユニット = [Si, O, O, O, O, H, H, H, H] (9原子)
+    → index % 9 == 0: Si,  1-4: O,  5-8: H
+    """
+    types = []
+    for i in range(len(mol_list)):
+        r = i % 9
+        if r == 0:
+            types.append('Si')
+        elif 1 <= r <= 4:
+            types.append('O')
+        else:
+            types.append('H')
+    return types
 
 def element_aware_descriptor(mol_list, n_bins=ELEM_BINS, r_max=RDF_R_MAX,
                                atom_types=None):
     """
-    元素ペア別 RDF 記述子 (Si-Si / Si-O / O-O の 3 チャンネル)
-    si_oh4 フォーマット前提: index%5==0 = Si, その他 = O
+    元素ペア別 RDF 記述子 (3 チャンネル・192次元)
+    Channel 0: Si-O  (Si-O 結合と近傍距離 → テトラヘドラル構造)
+    Channel 1: O-O   (O...O 非共有距離 → 結合角エンコード)
+    Channel 2: X-H   (O-H 結合 + H...H → 水素キャップ幾何)
+    si_oh4 フォーマット: 各 Si(OH)4 = [Si, O, O, O, O, H, H, H, H] (9原子/ユニット)
     出力: (3*n_bins,) = 192次元 固定長
     """
     pts = np.array(mol_list, dtype=np.float32)
@@ -75,9 +91,9 @@ def element_aware_descriptor(mol_list, n_bins=ELEM_BINS, r_max=RDF_R_MAX,
     if atom_types is None:
         atom_types = infer_atom_types_sioh4(mol_list)
 
-    hist_ss = np.zeros(n_bins, dtype=np.float32)
-    hist_so = np.zeros(n_bins, dtype=np.float32)
-    hist_oo = np.zeros(n_bins, dtype=np.float32)
+    hist_so = np.zeros(n_bins, dtype=np.float32)   # Si-O
+    hist_oo = np.zeros(n_bins, dtype=np.float32)   # O-O
+    hist_xh = np.zeros(n_bins, dtype=np.float32)   # X-H (anything involving H)
 
     for i in range(n):
         for j in range(i + 1, n):
@@ -87,19 +103,19 @@ def element_aware_descriptor(mol_list, n_bins=ELEM_BINS, r_max=RDF_R_MAX,
             b  = min(int(r / r_max * n_bins), n_bins - 1)
             ti = atom_types[i]
             tj = atom_types[j]
-            if ti == tj == 'Si':
-                hist_ss[b] += 1.0
+            if 'H' in (ti, tj):
+                hist_xh[b] += 1.0
             elif ti == tj == 'O':
                 hist_oo[b] += 1.0
-            else:
+            else:                        # Si-O or Si-Si
                 hist_so[b] += 1.0
 
-    for h in (hist_ss, hist_so, hist_oo):
+    for h in (hist_so, hist_oo, hist_xh):
         s = h.sum()
         if s > 0:
             h /= s
 
-    return np.concatenate([hist_ss, hist_so, hist_oo])
+    return np.concatenate([hist_so, hist_oo, hist_xh])
 
 def rdf_batch(mol_list_list):
     """フラグメントリスト → (N, ELEM_DIM) ndarray (element-aware)"""
@@ -889,12 +905,12 @@ def _build_mbe_bank(cif, supercell, mol_type, r_cut=R_CUT_DEF):
         if k not in bank.data:
             _store_with_mol(bank, k, mol, qc(mol))
 
-    # ペア (R_cut 以内)
-    coms = np.array([np.mean(np.vstack(m), axis=0) for m in mols])
+    # ペア (R_cut 以内) — np.concatenate で結合 (+ はnumpy加算になるためNG)
+    coms = np.array([np.vstack(m).mean(axis=0) for m in mols])
     for i in range(len(mols)):
         for j in range(i+1, len(mols)):
             if np.linalg.norm(coms[i] - coms[j]) < r_cut:
-                pair = mols[i] + mols[j]
+                pair = np.concatenate([mols[i], mols[j]], axis=0)
                 k = geom_key(pair)
                 if k not in bank.data:
                     _store_with_mol(bank, k, pair, qc(pair))
@@ -902,7 +918,7 @@ def _build_mbe_bank(cif, supercell, mol_type, r_cut=R_CUT_DEF):
     # トリマー (R_cut 以内、最大300件)
     trimer_idx = cutoff_trimers(mols, r_cut=r_cut, max_t=300)
     for i, j, k_idx in trimer_idx:
-        tri = mols[i] + mols[j] + mols[k_idx]
+        tri = np.concatenate([mols[i], mols[j], mols[k_idx]], axis=0)
         k   = geom_key(tri)
         if k not in bank.data:
             _store_with_mol(bank, k, tri, qc(tri))
