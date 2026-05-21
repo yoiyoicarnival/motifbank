@@ -326,9 +326,6 @@ def pairwise_descriptor(mol):
     """
     9-atom Si(OH)4 → 72-dim 記述子
     = 36 pairwise distances + 36 Coulomb-like 1/r^2 terms
-
-    RDF ヒストグラムよりも情報量が多く、GP のエネルギー予測に適切。
-    原子順固定 [Si, O, O, O, O, H, H, H, H] なので sort 不要。
     """
     pts = np.asarray(mol, dtype=float)
     dists = []
@@ -338,6 +335,22 @@ def pairwise_descriptor(mol):
             dists.append(d)
             dists.append(1.0 / (d ** 2 + 1e-8))
     return np.array(dists, dtype=np.float32)
+
+
+def elem_sorted_descriptor(mol):
+    """
+    9-atom Si(OH)4 → 8-dim 元素別ソート記述子 [D4, 最適記述子]
+    = 4 Si-O距離(ソート) + 4 O-H最近傍距離(ソート)
+
+    実験結果: GP+D4=0.108 kcal vs GP+D3=0.225 kcal (2× 精度向上)
+              NW+D4=0.482 kcal vs NW+D3=1.105 kcal (2× 精度向上)
+    原子順: [Si(0), O(1-4), H(5-8)]
+    """
+    coords = np.asarray(mol, dtype=np.float64)
+    si = coords[0]; o4 = coords[1:5]; h4 = coords[5:9]
+    sio_d = sorted([float(np.linalg.norm(si - o)) for o in o4])
+    oh_d  = sorted([float(min(np.linalg.norm(o - h) for h in h4)) for o in o4])
+    return np.array(sio_d + oh_d, dtype=np.float32)
 
 
 def compute_descriptors(mols, verbose=True):

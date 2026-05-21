@@ -48,15 +48,17 @@ from real_gp_benchmark import (
 
 EMBED_DIM   = 32   # 埋め込み次元
 HIDDEN_DIM  = 64
-INPUT_DIM   = 72   # pairwise_descriptor
+INPUT_DIM   = 72   # pairwise_descriptor (legacy)
+D4_DIM      = 8    # elem_sorted_desc: 4 Si-O + 4 O-H = 8 dim (optimal)
 TEMPERATURE = 0.07 # InfoNCE 温度パラメータ
 DEVICE      = "cpu"
 
 # ─────────────────────────────────────────────────
-# §1 pairwise descriptor (real_gp_benchmark と同一)
+# §1 記述子 (pairwise_desc + elem_sorted_desc)
 # ─────────────────────────────────────────────────
 
 def pairwise_desc(mol):
+    """全ペア距離+Coulomb (72dim) — 旧来の記述子"""
     pts = np.asarray(mol, dtype=float)
     dists = []
     for i in range(9):
@@ -65,6 +67,24 @@ def pairwise_desc(mol):
             dists.append(d)
             dists.append(1.0 / (d ** 2 + 1e-8))
     return np.array(dists, dtype=np.float32)
+
+
+def elem_sorted_desc(mol):
+    """
+    元素別ソート距離 (8dim) — Si(OH)₄ の最適記述子 [D4]
+    4 Si-O距離 (ソート済み) + 4 O-H最近傍距離 (ソート済み)
+
+    動機: エネルギーはSi-O伸縮とO-H伸縮に支配される。
+    実験結果: GP+D4=0.108 kcal (GP+D3=0.225 kcal の2倍精度),
+              NW+D4=0.482 kcal (NW+D3=1.105 kcal の2倍精度)
+    """
+    coords = np.asarray(mol, dtype=np.float64)
+    si = coords[0]
+    o4 = coords[1:5]
+    h4 = coords[5:9]
+    sio_d = sorted([float(np.linalg.norm(si - o)) for o in o4])
+    oh_d  = sorted([float(min(np.linalg.norm(o - h) for h in h4)) for o in o4])
+    return np.array(sio_d + oh_d, dtype=np.float32)
 
 
 # ─────────────────────────────────────────────────
