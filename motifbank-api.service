@@ -1,0 +1,21 @@
+[Unit]
+Description=MotifBank Fragment Energy API
+After=network.target
+
+[Service]
+Type=simple
+User=jetson
+WorkingDirectory=/home/jetson
+ExecStart=/usr/bin/python3 /home/jetson/api_server.py \
+    --bank /home/jetson/motif_bank.json \
+    --keys /home/jetson/api_keys.json \
+    --host 0.0.0.0 \
+    --port 8000
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/home/jetson/api_server.log
+StandardError=append:/home/jetson/api_server.log
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

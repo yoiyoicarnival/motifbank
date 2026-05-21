@@ -1,0 +1,30 @@
+{
+  "model": "gpt2",
+  "V": 50257,
+  "d": 768,
+  "W_F_lm_head": 890.4819,
+  "L_bound_U5": 445.2409,
+  "L_empirical_L2": 0.042282,
+  "L_empirical_cos": 14.570411,
+  "L_mean_L2": 0.012168,
+  "tightness_pct": 0.0095,
+  "bound_violations": 0,
+  "n_pairs": 4005,
+  "n_texts": 90,
+  "theorem_U5_status": "VERIFIED",
+  "top_pair": {
+    "text_i": "She loves him deeply.",
+    "text_j": "Seventeen dancing numbers refused happily.",
+    "d_L2": 11.8047,
+    "d_TV": 0.4991,
+    "ratio": 0.0423
+  },
+  "minimal_pair_cat_bat": {
+    "text_i": "The cat sat on the mat.",
+    "text_j": "The bat sat on the mat.",
+    "d_L2": 6.1779,
+    "d_TV": 0.1267,
+    "ratio": 0.0205
+  },
+  "key_finding": "Empirical L_LLM (0.042) is 10500x smaller than U5 bound (445). Theorem U5 is safe but very conservative. Real GPT-2 trust guarantee is practical."
+}

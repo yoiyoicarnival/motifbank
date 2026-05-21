@@ -1,0 +1,100 @@
+{
+  "theorem15": {
+    "Sierpinski三角形 gen=4 (Phase 0)": {
+      "d_eff": 0.2434424972200374,
+      "R2": 0.6999884982986277
+    },
+    "Vicsekフラクタル gen=3 (Phase 1)": {
+      "d_eff": 0.4217145102264592,
+      "R2": 0.6519703437459916
+    },
+    "ランダム点群 N=60 (Phase 3)": {
+      "d_eff": 1.992773684517869,
+      "R2": 0.9950233126644897
+    }
+  },
+  "theorem16": {
+    "ice Ih": {
+      "E_exact": 54.0916638916639,
+      "E_approx": 53.5968701942365,
+      "err_pct": 0.914731886263255
+    },
+    "alpha-cristobalite": {
+      "E_exact": 62.91194540753364,
+      "E_approx": 62.41657361033096,
+      "err_pct": 0.787404989614844
+    },
+    "LTA zeolite": {
+      "E_exact": 315.1121842599653,
+      "E_approx": 314.613446857144,
+      "err_pct": 0.1582729668142049
+    },
+    "MFI silicalite": {
+      "E_exact": 1754.2923159988777,
+      "E_approx": 1753.792611506348,
+      "err_pct": 0.02848467658282582
+    },
+    "Sierpinski gen=4": {
+      "E_exact": 14.7,
+      "E_approx": 14.213850804768331,
+      "err_pct": 3.3071373825283565
+    },
+    "Vicsek gen=3": {
+      "E_exact": 62.91194540753364,
+      "E_approx": 62.41657361033096,
+      "err_pct": 0.787404989614844
+    },
+    "Random N=60": {
+      "E_exact": 29212.4272561029,
+      "E_approx": 29211.927280906795,
+      "err_pct": 0.0017115154167807404
+    }
+  },
+  "theorem17": {
+    "Sierpinski三角形 gen=4 (Phase 0)": {
+      "phase": 0,
+      "N_bank_0": 6,
+      "eps_c": 0.43000000000000005,
+      "var_abs": 0.013155555555555554,
+      "var_norm": 0.07114957033832099,
+      "mean_eps_death": 0.2933333333333334,
+      "H0_bars_expected": 5,
+      "H0_bars_observed": 3
+    },
+    "Vicsekフラクタル gen=3 (Phase 1)": {
+      "phase": 1,
+      "N_bank_0": 18,
+      "eps_c": 0.33,
+      "var_abs": 0.008861538461538464,
+      "var_norm": 0.0813731722822632,
+      "mean_eps_death": 0.3,
+      "H0_bars_expected": 17,
+      "H0_bars_observed": 13
+    },
+    "ランダム点群 N=60 (Phase 3)": {
+      "phase": 3,
+      "N_bank_0": 3359,
+      "eps_c": 0.03,
+      "var_abs": 0.0010858401611581353,
+      "var_norm": 1.2064890679534837,
+      "mean_eps_death": 0.04429210134128167,
+      "H0_bars_expected": 3358,
+      "H0_bars_observed": 3355
+    }
+  },
+  "conjecture1": {
+    "gamma_inf_Gen12": 0.71,
+    "gamma_inf_Gen23": 0.805,
+    "gamma_inf_Gen34_pred": 0.8618393234672306,
+    "gamma_inf_Gen45_pred": 0.8958467833852564,
+    "r_convergence": 0.5983086680761096,
+    "d_H": 1.893
+  },
+  "verdict": {
+    "T15_Zador": "✅ PASS",
+    "T16_Coupon": "✅ PASS",
+    "T17_TDA_normalized": "✅ PASS",
+    "T18_KAM": "✅ PASS",
+    "C1_Dinfo": "NEEDS Gen3->4"
+  }
+}

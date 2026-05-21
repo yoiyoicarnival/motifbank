@@ -1,0 +1,77 @@
+{
+  "sigma_A": 0.03,
+  "method": "pbe",
+  "basis": "def2-svp",
+  "L_conservative_Ha_A": 0.11400000783846383,
+  "L_eff_Ha_A": 0.11400000783846383,
+  "theorem2_bound_conservative_kcal": 28.614412367482643,
+  "theorem2_bound_eff_kcal": 28.614412367482643,
+  "n_soft_match": 8,
+  "n_total": 8,
+  "samples": [
+    {
+      "label": "ref",
+      "d_geom_A": 0.0,
+      "soft_match": true,
+      "F_norm_Ha_A": 0.013324658996585354,
+      "F_max_atom_Ha_A": 0.006645948696103764,
+      "time_s": 19.760308611000255
+    },
+    {
+      "label": "d1",
+      "d_geom_A": 0.02614108880239021,
+      "soft_match": true,
+      "F_norm_Ha_A": 0.02667890619770609,
+      "F_max_atom_Ha_A": 0.014639797905238516,
+      "time_s": 22.245277572000305
+    },
+    {
+      "label": "d2",
+      "d_geom_A": 0.033403147422080295,
+      "soft_match": true,
+      "F_norm_Ha_A": 0.09628104539681934,
+      "F_max_atom_Ha_A": 0.0647989779442449,
+      "time_s": 21.007720526000412
+    },
+    {
+      "label": "d3",
+      "d_geom_A": 0.04445928633568151,
+      "soft_match": true,
+      "F_norm_Ha_A": 0.11400000783846383,
+      "F_max_atom_Ha_A": 0.06592822190163883,
+      "time_s": 21.076440353999715
+    },
+    {
+      "label": "d4",
+      "d_geom_A": 0.03201666885708339,
+      "soft_match": true,
+      "F_norm_Ha_A": 0.05129163629327916,
+      "F_max_atom_Ha_A": 0.024550564796715572,
+      "time_s": 21.16190696099966
+    },
+    {
+      "label": "d5",
+      "d_geom_A": 0.037537992323518996,
+      "soft_match": true,
+      "F_norm_Ha_A": 0.0886382062437802,
+      "F_max_atom_Ha_A": 0.04250379839481946,
+      "time_s": 20.190104868000162
+    },
+    {
+      "label": "d6",
+      "d_geom_A": 0.048106360526857024,
+      "soft_match": true,
+      "F_norm_Ha_A": 0.10596424931463828,
+      "F_max_atom_Ha_A": 0.05074612126756977,
+      "time_s": 17.162821992999852
+    },
+    {
+      "label": "d7",
+      "d_geom_A": 0.037054528215274364,
+      "soft_match": true,
+      "F_norm_Ha_A": 0.08196299741695354,
+      "F_max_atom_Ha_A": 0.04779159948060632,
+      "time_s": 16.014971071999753
+    }
+  ]
+}

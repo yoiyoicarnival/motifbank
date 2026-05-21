@@ -1,0 +1,10 @@
+{
+  "cif": "/tmp/LTA_zeolite.cif",
+  "supercell": [1, 1, 1],
+  "mol_type": "sio4",
+  "R_cut": 5.5,
+  "T_K": 300,
+  "eps_match": 0.10,
+  "bank_file": "examples/zeolite_lta_bank.json",
+  "_note": "LTA ゼオライト: Si-O フレームワーク。SiO4 四面体単位として断片化。O 原子はブリッジ共有のため近似。"
+}

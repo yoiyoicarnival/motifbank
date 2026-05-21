@@ -9,6 +9,7 @@ build/
 .venv/
 venv/
 py39_venv/
+test-py/
 
 # テスト・キャッシュ
 .pytest_cache/

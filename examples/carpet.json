@@ -1,0 +1,8 @@
+{
+  "system": "carpet",
+  "gen": 2,
+  "R_cut": 6.0,
+  "T_K": 0,
+  "eps_match": 0.05,
+  "bank_file": "examples/carpet_bank.json"
+}

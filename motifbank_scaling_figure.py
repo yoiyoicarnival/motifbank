@@ -193,6 +193,9 @@ def main():
             import matplotlib
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
+            import matplotlib.font_manager as fm
+            fm.fontManager.addfont("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc")
+            plt.rcParams["font.family"] = "Noto Sans CJK JP"
 
             fig, ax = plt.subplots(figsize=(7, 5))
 
@@ -201,18 +204,18 @@ def main():
             Na = [d[0] for d in data_amor]
 
             ax.plot(Nc, [d[1] for d in data_crys],
-                    "o-", color="#1f77b4", lw=2, ms=7, label=f"crystal (MFI, γ={exp_c:.2f})")
+                    "o-", color="#1f77b4", lw=2, ms=7, label=f"結晶（MFI, γ={exp_c:.2f}）")
             ax.plot(Nd, [d[1] for d in data_deft],
-                    "s--", color="#ff7f0e", lw=2, ms=7, label=f"defect  (σ=0.25Å, γ={exp_d:.2f})")
+                    "s--", color="#ff7f0e", lw=2, ms=7, label=f"欠陥結晶（σ=0.25Å, γ={exp_d:.2f}）")
             ax.plot(Na, [d[1] for d in data_amor],
-                    "^:", color="#d62728", lw=2, ms=7, label=f"amorphous (γ={exp_a:.2f})")
+                    "^:", color="#d62728", lw=2, ms=7, label=f"非晶質（γ={exp_a:.2f}）")
 
             ax.axhline(nb_sat_crys, color="#1f77b4", lw=1, ls=":", alpha=0.5,
-                       label=f"Phase 0 saturation = {nb_sat_crys}")
+                       label=f"Phase 0 飽和 = {nb_sat_crys}")
 
-            ax.set_xlabel("N  (number of Si(OH)₄ fragments)", fontsize=12)
-            ax.set_ylabel("N_bank  (unique fragment types in bank)", fontsize=12)
-            ax.set_title("MotifBank: N_bank(N) Scaling — Crystal vs Defect vs Amorphous",
+            ax.set_xlabel("N（Si(OH)₄ フラグメント数）", fontsize=12)
+            ax.set_ylabel("N_bank（バンク内ユニーク構造数）", fontsize=12)
+            ax.set_title("MotifBank: N_bank(N) スケーリング — 結晶 vs 欠陥 vs 非晶質",
                          fontsize=11)
             ax.legend(fontsize=10)
             ax.grid(True, alpha=0.3)

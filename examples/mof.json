@@ -1,0 +1,8 @@
+{
+  "system": "mof",
+  "n_pores": 9,
+  "d_inter": 12.0,
+  "T_K": 300,
+  "eps_match": 0.1,
+  "bank_file": "examples/mof_bank.json"
+}

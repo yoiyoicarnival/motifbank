@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "R": 22,
+      "N_bank": 5404,
+      "N_trim": 3770148,
+      "capped": false
+    },
+    {
+      "R": 27,
+      "N_bank": 12078,
+      "N_trim": 7169228,
+      "capped": false
+    }
+  ],
+  "N_bank_sat_Gen2": 987,
+  "N_bank_sat_Gen3_conjecture_pred": 7064.669107981162,
+  "d_H": 1.893
+}

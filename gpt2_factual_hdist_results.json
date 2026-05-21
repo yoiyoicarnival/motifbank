@@ -1,0 +1,32 @@
+{
+  "dataset_size": 166,
+  "train_size": 116,
+  "test_size": 50,
+  "bank_size": 27,
+  "overall_accuracy": 0.21686746987951808,
+  "test_accuracy": 0.18,
+  "pb_correlation": -0.5534819751538461,
+  "pb_pvalue": 3.058814077002159e-05,
+  "sp_correlation": -0.4924101124010707,
+  "sp_pvalue": 0.0002808208485190541,
+  "correlation_strength": "SIGNIFICANT",
+  "logistic_fit": {
+    "a": 0.30136008113376067,
+    "rc": 55.608051358064415,
+    "R2": 0.9108235815651724
+  },
+  "d_min_by_difficulty": {
+    "easy": {
+      "accuracy": 0.21875,
+      "d_min_mean": 70.54508602619171
+    },
+    "medium": {
+      "accuracy": 0.07142857142857142,
+      "d_min_mean": 69.53811999729702
+    },
+    "hard": {
+      "accuracy": 0.25,
+      "d_min_mean": 78.96803092956543
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "system": "ice2d",
+  "nx": 6,
+  "ny": 6,
+  "T_K": 300,
+  "eps_match": 0.1,
+  "bank_file": "examples/ice_bank.json"
+}

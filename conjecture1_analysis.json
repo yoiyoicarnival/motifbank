@@ -1,0 +1,39 @@
+{
+  "energy_gamma": {
+    "Gen1→2": {
+      "gamma_inf": 0.71,
+      "k": 0.1714,
+      "R_th": 6.48,
+      "type": "energy"
+    },
+    "Gen2→3": {
+      "gamma_inf": 0.805,
+      "k": 0.03755,
+      "R_th": 21.32,
+      "type": "energy"
+    }
+  },
+  "geom_gamma_R22": {
+    "Gen2→3_R22": {
+      "N_bank_Gen2": 987,
+      "N_bank_Gen3": 5404,
+      "N_Gen2": 64,
+      "N_Gen3": 512,
+      "R": 22,
+      "gamma_at_R": 0.8176352282897624
+    }
+  },
+  "geom_gamma_R27": {
+    "Gen2→3_R27": {
+      "N_bank_Gen2": 987,
+      "N_bank_Gen3": 12078,
+      "N_Gen2": 64,
+      "N_Gen3": 512,
+      "R": 27,
+      "gamma_at_R": 1.204395894395366
+    }
+  },
+  "geom_gamma_sat_Gen12": 2.258993757671362,
+  "d_H": 1.893,
+  "new_conjecture": "2*gamma_geom_sat(Gen n→n+1) → d_H (not d_H/2)"
+}

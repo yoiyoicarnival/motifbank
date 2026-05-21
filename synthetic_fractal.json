@@ -1,0 +1,172 @@
+{
+  "sierpinski": {
+    "fractal": "sierpinski",
+    "label": "Sierpinski\u4e09\u89d2\u5f62",
+    "df_theory": 1.584962500721156,
+    "gamma_global": 0.25740171432858827,
+    "gamma_intercept": 0.6025562284027748,
+    "phase": "Phase 1 (\u6e96\u5468\u671f)",
+    "data": [
+      {
+        "gen": 1,
+        "N": 3,
+        "N_bank": 1,
+        "gamma_local": NaN,
+        "reuse": 1.0
+      },
+      {
+        "gen": 2,
+        "N": 6,
+        "N_bank": 5,
+        "gamma_local": 2.321928094887362,
+        "reuse": 4.0
+      },
+      {
+        "gen": 3,
+        "N": 15,
+        "N_bank": 6,
+        "gamma_local": 0.19897784671578994,
+        "reuse": 75.83333333333333
+      },
+      {
+        "gen": 4,
+        "N": 42,
+        "N_bank": 6,
+        "gamma_local": NaN,
+        "reuse": 1913.3333333333333
+      },
+      {
+        "gen": 5,
+        "N": 123,
+        "N_bank": 6,
+        "gamma_local": NaN,
+        "reuse": 50436.833333333336
+      },
+      {
+        "gen": 6,
+        "N": 366,
+        "N_bank": 6,
+        "gamma_local": NaN,
+        "reuse": 1350743.3333333333
+      }
+    ],
+    "r_cut_factor": 2.5
+  },
+  "vicsek": {
+    "fractal": "vicsek",
+    "label": "Vicsek\u30d5\u30e9\u30af\u30bf\u30eb",
+    "df_theory": 1.4649735207179273,
+    "gamma_global": 0.12920296742201803,
+    "gamma_intercept": 1.0986122886681093,
+    "phase": "Phase 1 (\u6e96\u5468\u671f)",
+    "data": [
+      {
+        "gen": 1,
+        "N": 5,
+        "N_bank": 3,
+        "gamma_local": NaN,
+        "reuse": 3.3333333333333335
+      },
+      {
+        "gen": 2,
+        "N": 25,
+        "N_bank": 6,
+        "gamma_local": 0.43067655807339306,
+        "reuse": 383.3333333333333
+      },
+      {
+        "gen": 3,
+        "N": 125,
+        "N_bank": 6,
+        "gamma_local": NaN,
+        "reuse": 52958.333333333336
+      },
+      {
+        "gen": 4,
+        "N": 625,
+        "N_bank": 6,
+        "gamma_local": NaN,
+        "reuse": 6749166.666666667
+      }
+    ],
+    "r_cut_factor": 2.5
+  },
+  "carpet": {
+    "fractal": "carpet",
+    "label": "Sierpinski\u30ab\u30fc\u30da\u30c3\u30c8",
+    "df_theory": 1.8927892607143724,
+    "gamma_global": 6.105020777473198e-17,
+    "gamma_intercept": 1.9459101490553126,
+    "phase": "Phase 0 (\u7d50\u6676)",
+    "data": [
+      {
+        "gen": 1,
+        "N": 8,
+        "N_bank": 7,
+        "gamma_local": NaN,
+        "reuse": 8.0
+      },
+      {
+        "gen": 2,
+        "N": 64,
+        "N_bank": 7,
+        "gamma_local": NaN,
+        "reuse": 5952.0
+      },
+      {
+        "gen": 3,
+        "N": 512,
+        "N_bank": 7,
+        "gamma_local": NaN,
+        "reuse": 3176960.0
+      },
+      {
+        "gen": 4,
+        "N": 4096,
+        "N_bank": 7,
+        "gamma_local": NaN,
+        "reuse": 1634979840.0
+      }
+    ],
+    "r_cut_factor": 2.5
+  },
+  "cantor": {
+    "fractal": "cantor",
+    "label": "\u30ab\u30f3\u30c8\u30fc\u30eb\u30c0\u30b9\u30c8(2D)",
+    "df_theory": 1.261859507142915,
+    "gamma_global": 0.0,
+    "gamma_intercept": 0.0,
+    "phase": "Phase 0 (\u7d50\u6676)",
+    "data": [
+      {
+        "gen": 1,
+        "N": 4,
+        "N_bank": 1,
+        "gamma_local": NaN,
+        "reuse": 4.0
+      },
+      {
+        "gen": 2,
+        "N": 16,
+        "N_bank": 1,
+        "gamma_local": NaN,
+        "reuse": 560.0
+      },
+      {
+        "gen": 3,
+        "N": 64,
+        "N_bank": 1,
+        "gamma_local": NaN,
+        "reuse": 41664.0
+      },
+      {
+        "gen": 4,
+        "N": 256,
+        "N_bank": 1,
+        "gamma_local": NaN,
+        "reuse": 2763520.0
+      }
+    ],
+    "r_cut_factor": 2.5
+  }
+}

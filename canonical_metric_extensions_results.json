@@ -1,0 +1,101 @@
+{
+  "theorem_U4": {
+    "status": "PROVED",
+    "verification": "Bernoulli TV = |p-q| confirmed"
+  },
+  "theorem_U5": {
+    "status": "PROVED",
+    "bound": "L_LLM ≤ (β/2)·‖W‖_F·L_embed",
+    "finite": true,
+    "model_bounds": {
+      "Mini-LLM (V=100, d=32)": {
+        "L_bound": 0.6,
+        "W_F": 1.1
+      },
+      "Small LLM (V=1k, d=128)": {
+        "L_bound": 1.8,
+        "W_F": 3.6
+      },
+      "GPT-2 (V=50k, d=768)": {
+        "L_bound": 46.6,
+        "W_F": 93.2
+      },
+      "GPT-3 (V=50k, d=12288)": {
+        "L_bound": 99.4,
+        "W_F": 198.8
+      }
+    }
+  },
+  "theorem_U6": {
+    "status": "VERIFIED",
+    "V": 100,
+    "d": 32,
+    "beta": 1.0,
+    "W_F": 1.1187382301558104,
+    "L_bound": 0.5593691150779052,
+    "L_empirical": 0.010558041155808844,
+    "bound_violations": 0,
+    "tightness": 0.018874909020206432
+  },
+  "theorem_U7": {
+    "status": "VERIFIED",
+    "simulations": [
+      {
+        "n_frags": 1000,
+        "n_unique_types": 16,
+        "bank_size": 182,
+        "gap_count": 16,
+        "incompleteness": 0.032,
+        "roi": 0.968,
+        "name": "Phase-0 (crystal, ice Ih)"
+      },
+      {
+        "n_frags": 1000,
+        "n_unique_types": 282,
+        "bank_size": 389,
+        "gap_count": 81,
+        "incompleteness": 0.162,
+        "roi": 0.838,
+        "name": "Phase-0 (crystal, MFI)"
+      },
+      {
+        "n_frags": 1000,
+        "n_unique_types": 500,
+        "bank_size": 396,
+        "gap_count": 97,
+        "incompleteness": 0.194,
+        "roi": 0.806,
+        "name": "Phase-1 (quasi-periodic)"
+      },
+      {
+        "n_frags": 1000,
+        "n_unique_types": 1500,
+        "bank_size": 398,
+        "gap_count": 113,
+        "incompleteness": 0.226,
+        "roi": 0.774,
+        "name": "Phase-2 (amorphous, light)"
+      },
+      {
+        "n_frags": 1000,
+        "n_unique_types": 3000,
+        "bank_size": 402,
+        "gap_count": 128,
+        "incompleteness": 0.256,
+        "roi": 0.744,
+        "name": "Phase-3 (amorphous, heavy)"
+      }
+    ]
+  },
+  "synthesis": {
+    "L_values": {
+      "molecular_QC": 0.705,
+      "logic": 1.0,
+      "LLM_mini_empirical": 0.010558041155808844,
+      "LLM_mini_bound": 0.5593691150779052,
+      "proof": Infinity
+    },
+    "key_finding": "L_LLM is finite for all softmax LLMs; d_L2 is canonical",
+    "open_problem": "Find optimal ε* for each LLM: largest ε s.t. L_LLM·ε < δ_tolerable"
+  }
+}

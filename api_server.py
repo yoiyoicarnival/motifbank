@@ -471,6 +471,95 @@ if HAS_FASTAPI:
             elapsed_s=r['elapsed_s'], cost_jpy=cost,
         )
 
+    # ── OOD Check (Theorem 3) ─────────────────────────────────────────────────
+
+    class OODRequest(BaseModel):
+        atoms:       List[AtomIn] = Field(..., description="クエリ分子の原子リスト")
+        eps:         float = Field(0.10, description="OOD閾値 ε (Å)")
+        L_geom:      float = Field(0.705, description="Lipschitz定数 (Ha/Å)")
+        return_dmin: bool  = Field(True,  description="d_min値を返す")
+
+    class OODResponse(BaseModel):
+        trustworthy:    bool
+        d_min:          Optional[float]
+        phase:          int
+        guarantee:      str    # "phase0-exact" / "lipschitz" / "none"
+        error_bound_ha: Optional[float]
+        error_bound_kcal: Optional[float]
+        reject_reason:  Optional[str]
+        geom_key:       str
+        expected_error_amplification: Optional[int]
+
+    @app.post("/v1/check", response_model=OODResponse)
+    def check_ood(req: OODRequest,
+                  x_api_key: Optional[str] = Header(None)):
+        """OOD判定 (Theorem 3): d_min < ε → TRUST, d_min ≥ ε → REFUSE"""
+        t0 = time.time()
+        info = _auth(x_api_key)
+        if not _check_rate(x_api_key or 'anon', info.get('tier', 'free')):
+            raise HTTPException(429, "レート制限超過")
+
+        coords   = np.array([[a.x, a.y, a.z] for a in req.atoms])
+        mol_list = [coords]
+        gk       = _geom_key(mol_list)
+
+        # d_min: minimum RMSD to bank geometries (Theorem 3)
+        dv_query = dist_vec(mol_list)
+
+        min_dist = float('inf')
+        nearest  = None
+        for bank_key, entry in _bank.data.items():
+            dv_bank = np.array(entry.get('dist_vec', []))
+            if len(dv_bank) != len(dv_query):
+                continue
+            d = float(np.sqrt(np.mean((dv_query - dv_bank)**2)))
+            if d < min_dist:
+                min_dist = d
+                nearest  = bank_key
+
+        eps = req.eps
+        L   = req.L_geom
+
+        if min_dist < 0.001:
+            guarantee = "phase0-exact"
+            bound_ha  = 0.0
+            trust     = True
+            phase     = 0
+            reject    = None
+            amp       = None
+        elif min_dist < eps:
+            guarantee = "lipschitz"
+            bound_ha  = L * min_dist
+            trust     = True
+            phase     = 0
+            reject    = None
+            amp       = None
+        else:
+            guarantee = "none"
+            bound_ha  = None
+            trust     = False
+            phase     = 3
+            reject    = f"OOD: d_min={min_dist:.3f} ≥ ε={eps}"
+            amp       = 126
+
+        bound_kcal = round(bound_ha * 627.5, 2) if bound_ha is not None else None
+
+        ms = int((time.time() - t0) * 1000)
+        cost = 5
+        _track(x_api_key or 'anon', 'ood_check', cost, ms, gk)
+
+        return OODResponse(
+            trustworthy=trust,
+            d_min=round(min_dist, 4) if req.return_dmin else None,
+            phase=phase,
+            guarantee=guarantee,
+            error_bound_ha=round(bound_ha, 4) if bound_ha is not None else None,
+            error_bound_kcal=bound_kcal,
+            reject_reason=reject,
+            geom_key=str(gk)[:40] + ('...' if len(str(gk)) > 40 else ''),
+            expected_error_amplification=amp,
+        )
+
     # ── 管理者: キー発行 ──
     @app.post("/admin/keys")
     def admin_add_key(req: NewKeyRequest):

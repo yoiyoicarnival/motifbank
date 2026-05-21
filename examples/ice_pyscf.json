@@ -1,0 +1,12 @@
+{
+  "cif": "examples/ice_test.cif",
+  "supercell": [1, 1, 1],
+  "mol_type": "h2o",
+  "R_cut": 6.0,
+  "T_K": 300,
+  "eps_match": 0.10,
+  "bank_file": "examples/ice_pyscf_bank.json",
+  "qc_backend": "pyscf",
+  "qc_basis": "sto-3g",
+  "qc_method": "hf"
+}

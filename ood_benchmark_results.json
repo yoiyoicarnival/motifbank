@@ -1,0 +1,41 @@
+{
+  "N_train": 150,
+  "N_test": 300,
+  "eps": 0.1,
+  "baseline": {
+    "id_mae": 0.21445138338784736,
+    "ood_mae": 1.3461573356496908,
+    "amplification_x": 6.2772145107364015,
+    "ood_p99": 6.4322805688839475
+  },
+  "motifbank": {
+    "id_pass_rate": 0.9966666666666667,
+    "ood_detect_rate": 1.0,
+    "id_mae_passed": 0.21470282729769682,
+    "formal_bound_Ha": 0.0705,
+    "mathematical_guarantee": true,
+    "hard_refusal": true
+  },
+  "ensemble": {
+    "id_pass_rate": 0.95,
+    "ood_detect_rate": 0.02666666666666667,
+    "mathematical_guarantee": false,
+    "hard_refusal": false,
+    "confidently_wrong_cases": 292
+  },
+  "conformal": {
+    "alpha": 0.1,
+    "threshold": 0.2734163379285204,
+    "id_coverage": 0.8633333333333333,
+    "ood_coverage": 0.01,
+    "mathematical_guarantee": "IID only",
+    "hard_refusal": false
+  },
+  "real_data": {
+    "MFI_bank_hit_kcal": 2.24,
+    "MFI_bank_miss_kcal": 283.0,
+    "real_amplification_x": 126,
+    "phase0_exact_error": 0.0,
+    "source": "PBE/def2-SVP, commit 2ea2592"
+  }
+}

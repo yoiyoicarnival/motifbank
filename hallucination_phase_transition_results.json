@@ -1,0 +1,51 @@
+{
+  "A_jacobian": {
+    "U8_global_bound": 1.521204134104826,
+    "J_max": 0.0030765343933369838,
+    "J_mean": 0.0030432945850757164,
+    "J_p99": 0.003065566161061171,
+    "L_local": 0.010013058076316472,
+    "J_anchor": 0.0030431764900219036,
+    "spatial_variation_std": 9.485031908628781e-06
+  },
+  "B_metric_invariance": {
+    "status": "VERIFIED",
+    "kappa_by_metric": {
+      "d_L2": {
+        "L_adv": 0.012253512060707952,
+        "L_nat": 0.010342790788183278,
+        "kappa": 0.8440674589408874
+      },
+      "d_cos": {
+        "L_adv": 0.28722732259289274,
+        "L_nat": 0.01928272631188954,
+        "kappa": 0.06713402519585607
+      },
+      "d_L1": {
+        "L_adv": 0.0028789024853611705,
+        "L_nat": 0.0024702225990077577,
+        "kappa": 0.8580431645630602
+      }
+    },
+    "kappa_stability_L2": {
+      "mean": 0.8019737303916915,
+      "std": 0.015310296848186784
+    }
+  },
+  "C_phase_transition": {
+    "r_c_empirical": 0.8214,
+    "r_c_predicted": 0.4993479476391255,
+    "logistic_a": 12.362648955116157,
+    "logistic_rc": 0.7797626733402578,
+    "logistic_R2": 0.9989465274364534,
+    "delta": 0.05,
+    "n_anchors": 200,
+    "transition_found": true
+  },
+  "synthesis": {
+    "U8_correction": "Local \u2016J\u2016 mean=0.0030 vs global bound=1.5212",
+    "U9_robustness": "VERIFIED",
+    "U12_status": "VERIFIED",
+    "key_message": "P(hallucination) is a logistic function of d_min, with critical radius r_c\u22480.7798. RAG effectiveness requires \u03c3_retrieval < r_c - d_min."
+  }
+}

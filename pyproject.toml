@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "motifbank"
+version = "1.0.0"
+description = "MBE fragment energy bank — reuse QC calculations across structurally similar fragments"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+authors = [{ name = "B126" }]
+
+dependencies = [
+    "numpy>=1.21",
+]
+
+[project.optional-dependencies]
+qc = ["pyscf>=2.0"]
+cif = ["ase>=3.20"]
+api = ["fastapi>=0.100", "uvicorn>=0.23", "pydantic>=2.0"]
+full = ["pyscf>=2.0", "ase>=3.20", "fastapi>=0.100", "uvicorn>=0.23", "pydantic>=2.0"]
+
+[project.scripts]
+motifbank = "motifbank_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["motifbank*"]
+
+[tool.setuptools.package-data]
+"*" = ["examples/*.json", "examples/*.cif"]

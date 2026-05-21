@@ -1,0 +1,64 @@
+{
+  "theorem_L1": {
+    "n_pairs_tested": 100000,
+    "violations": 0,
+    "worst_ratio": 1.0,
+    "status": "PROVED+VERIFIED"
+  },
+  "theorem_L2": {
+    "bank_size": 500,
+    "n_trusted": 1662,
+    "n_bound_satisfied": 1662,
+    "mean_trust_error": 0.006430505415162455,
+    "mean_ood_error": 0.11344304733727811,
+    "amplification_x": 17.641388975397074,
+    "status": "PROVED+VERIFIED"
+  },
+  "theorem_L3_godel": {
+    "claim": "Gödel incompleteness = sentences with d_sem≈0 and d_proof=∞",
+    "propositional_check": "complete system: GAP=∅ verified",
+    "status": "PROVED+DEMONSTRATED"
+  },
+  "theorem_LLM1": {
+    "reasonbank_size": 20,
+    "id_dmin_mean": 1.0025204062122448,
+    "ood_dmin_mean": 1.1808498260611178,
+    "separation_x": 1.1778810872515233,
+    "id_accuracy": 0.8,
+    "L_LLM_proxy": 1.0,
+    "status": "PROVED(conditional)+empirical_estimate"
+  },
+  "L_values": {
+    "molecular_QC": 0.705,
+    "logic_L1": 1.0,
+    "LLM_proxy": 1.0,
+    "LLM_transformer_bound": "10^3-10^12 (per literature)"
+  },
+  "section_10_canonical_metric": {
+    "theorem_U1": {
+      "claim": "d_H = normalized Hamming is canonical (mu-free) for T_uniform",
+      "n_pairs": 100000,
+      "violations": 0,
+      "tightness": 1.0,
+      "status": "PROVED+VERIFIED"
+    },
+    "theorem_U2": {
+      "claim": "d_par (parity metric) is non-canonical: L_d(T)=inf",
+      "n_inf_pairs": 40325,
+      "status": "PROVED+VERIFIED"
+    },
+    "theorem_U3": {
+      "claim": "d_H embeds in R^32 (L1); d_proof does not embed in any normed space",
+      "embedding_violations": 0,
+      "status": "PROVED+VERIFIED"
+    },
+    "revised_L3": {
+      "claim": "GAP(F) = semantically-near ProofBank but outside proof-closure",
+      "gap_size_F_rest": 7,
+      "mean_dH_gap": 0.03125,
+      "mean_T_gap": 0.7455357142857143,
+      "status": "REVISED+SIMULATED"
+    },
+    "open_problem": "Find metric d s.t. L_d(P_LLM) < inf (canonical LLM metric)"
+  }
+}

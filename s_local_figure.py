@@ -58,6 +58,9 @@ def main():
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+        import matplotlib.font_manager as fm
+        fm.fontManager.addfont("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc")
+        plt.rcParams["font.family"] = "Noto Sans CJK JP"
 
         fig, ax = plt.subplots(figsize=(8, 5))
 
@@ -84,7 +87,7 @@ def main():
         ax.set_xticks(range(len(labels)))
         ax.set_xticklabels(labels, fontsize=9)
         ax.set_ylabel("$S_{\\rm local}$ = log($N_{\\rm bank,sat}$)  [nats]", fontsize=12)
-        ax.set_title("MotifBank: Local Geometry Entropy $S_{\\rm local}$ by Material",
+        ax.set_title("MotifBank: 材料別 局所幾何エントロピー $S_{\\rm local}$",
                      fontsize=11)
         ax.set_ylim(0, max(vals) * 1.25)
         ax.axhline(np.log(644), color='#1f77b4', lw=0.8, ls='--', alpha=0.4)
@@ -92,11 +95,11 @@ def main():
         # 凡例 (Phase)
         from matplotlib.patches import Patch
         legend_elements = [
-            Patch(facecolor=colors[0], label='Phase 0 (saturates)'),
-            Patch(facecolor=colors[1], label='Phase 1 (sub-linear)'),
-            Patch(facecolor=colors[3], label='Phase 3 (linear)'),
+            Patch(facecolor=colors[0], label='Phase 0（飽和型）'),
+            Patch(facecolor=colors[1], label='Phase 1（準線形）'),
+            Patch(facecolor=colors[3], label='Phase 3（線形）'),
             Patch(facecolor='white', edgecolor='black', hatch='///',
-                  label='estimated (~)'),
+                  label='推定値（~）'),
         ]
         ax.legend(handles=legend_elements, fontsize=9, loc='upper left')
         ax.grid(True, axis='y', alpha=0.3)
