@@ -170,6 +170,24 @@ class MotifBank:
 # §3. Phase 分類エンジン
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# §7. PYP 理論: ε* 最適値の推定
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def eps_star_optimal(gamma_star, method="empirical"):
+    """
+    MotifBank の soft matching tolerance を材料の gamma* から自動設定
+    (PYP Diffusion 理論から導出: ε* = alpha*gamma* + beta)
+
+    method="theory":    ε*(d) = 1.62*d/20   [情報理論的]
+    method="empirical": ε*(d) = 0.1414*d + 0.1104  [実 CIF からフィット]
+    """
+    if method == "theory":
+        return 1.62 * float(gamma_star) / 20.0
+    else:
+        return 0.1414 * float(gamma_star) + 0.1104
+
 def classify(mols, mols_2x=None, r_cut=R_CUT_DEF, T_K=300.0,
              eps_match=0.10, label="system", verbose=True):
     """
@@ -251,6 +269,7 @@ def classify(mols, mols_2x=None, r_cut=R_CUT_DEF, T_K=300.0,
         "roi_pct":      round(roi * 100, 1),
         "roi_amort_pct":round(roi_amort * 100, 1),
         "strategy":     strategy,
+        "eps_star":     round(eps_star_optimal(gamma), 4),
         "elapsed_ms":   round(elapsed_ms, 1),
     }
 
@@ -430,7 +449,8 @@ def make_qc_func(backend='mock', basis='sto-3g', method='hf',
 def run_mbe(mols, bank, r_cut=R_CUT_DEF, eps_match=0.10,
             qc_func=None, atom_types_list=None,
             charge_per_mol=0, spin_per_mol=0,
-            verbose=True, memory_saving=False):
+            verbose=True, memory_saving=False,
+            refresh_mono=False):
     """
     MBE 計算 (bank 使用)
 
@@ -444,6 +464,8 @@ def run_mbe(mols, bank, r_cut=R_CUT_DEF, eps_match=0.10,
     atom_types_list: [["O","H","H"], ...] -- pyscf バックエンド使用時に必須
     charge_per_mol:  各分子の電荷 (H3+ なら +1, H2O なら 0)
     spin_per_mol:    各分子の 2S (通常 0 = singlet)
+    refresh_mono:    True → モノマーを毎回新規QC (trajectory reuse 用)
+                     de2/de3 のみバンク再利用。DECIMAL=1 精度問題を回避。
     """
     if qc_func is None:
         qc_func = qc_compute_mock
@@ -470,10 +492,16 @@ def run_mbe(mols, bank, r_cut=R_CUT_DEF, eps_match=0.10,
     E_mono = {}
     for i, mol in enumerate(mols):
         key = geom_key([mol])
-        e = bank.query_exact(key)
-        if e is None:
+        if refresh_mono:
+            # trajectory reuse モード: モノマーは毎回新規QC しバンクには書かない
+            # bank.store() すると同一 geom_key の分子が dist_vec を上書きし
+            # 後続の 2体/3体 query_soft の ndv フィルタを壊す (ice2d 6.7mHa バグ)
             e = _qc([i])
-            bank.store(key, [mol], e, source="qc_computed")
+        else:
+            e = bank.query_exact(key)
+            if e is None:
+                e = _qc([i])
+                bank.store(key, [mol], e, source="qc_computed")
         E_mono[i] = e
 
     # -- 2体 --
